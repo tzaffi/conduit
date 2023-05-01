@@ -1,0 +1,46 @@
+log-level: INFO
+
+# If no log file is provided logs are written to stdout.
+#log-file:
+
+retry-count: 1
+
+retry-delay: "1s"
+
+# Optional filepath to use for pidfile.
+#pid-filepath: /path/to/pidfile
+
+# Whether or not to print the conduit banner on startup.
+hide-banner: false
+
+# When enabled prometheus metrics are available on '/metrics'
+metrics:
+  mode: OFF
+  addr: ":9999"
+  prefix: "conduit"
+
+importer:
+  name: algod
+  config:
+    mode: "follower"
+    # shouldn't we be able to specify the starting sync round?
+    # VOLATILE:
+    netaddr: "http://127.0.0.1:63135"
+    # VOLATILE:
+    token: "dc99e2f8e526dbcf2a6e362d7a3beab6db8b1b848b0268c2b269a86c96b6e1bd"
+
+processors:
+  - name: filter_processor
+    config:
+      filters:
+        - any:
+          - tag: txn.snd
+            expression-type: equal
+            expression: "NOTIFY2IJIXDNDCHF4EJZJOQYEQACIEVAIXBQMSZU4YTDKHWPLVYGTOU5Y"
+
+exporter:
+  name: "file_writer"
+  config:
+    block-dir: "/Users/zeph/github/algorand/conduit/examples/blocks"
+    filename-pattern: "block_%09d.json"
+    drop-certificate: true
