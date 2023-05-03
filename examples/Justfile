@@ -14,8 +14,12 @@ DATA_NODE := env_var_or_default("DATA_NODE", PRIVATE_DATA_NODE)
 IS_PUBLIC_TRUTHY := env_var_or_default("DATA_NODE", "")
 ALGORAND_DATA := CURR_NETWORK + "/" + DATA_NODE
 ALGORAND_TOKEN_PATH := ALGORAND_DATA + "/algod.token"
+ALGORAND_ADTOKEN_PATH := ALGORAND_DATA + "/algod.admin.token"
 ALGORAND_ALGOD_PATH := ALGORAND_DATA + "/algod.net"
 ALGORAND_PID_PATH := ALGORAND_DATA + "/algod.pid"
+
+PRESET_ALGOD_TOKEN := "16b29a0a2bbcc535f1e9e40f0c0888013f3789bf2bd34e7907c8fb1ae9d16024"
+PRESET_ALGOD_ADMIN := "20064faacad1e590e757ac9492506c2d948633d7c458651b16a3991d26997695"
 
 # Older:
 BOXES_TEAL := "boxes.teal"
@@ -245,8 +249,11 @@ pub-prepare: pub-validate-datadir
     mkdir -p $ALGORAND_DATA
 
 # configure a Conduit's network using `algocfg`
-pub-create NODE_PROFILE="conduit" NETWORK="testnet": pub-prepare
+pub-create NODE_PROFILE="conduit" NETWORK="testnet" ENDPOINT="127.0.0.1:56765" PT="1" PAT="1": pub-prepare
     algocfg profile set {{NODE_PROFILE}} -d $ALGORAND_DATA
+    [ -n {{ENDPOINT}} ] && echo "setting ENDPOINT={{ENDPOINT}}" && algocfg set -p EndpointAddress -v {{ENDPOINT}}
+    [ {{PT}} = "1" ] && echo "setting ALGOD TOKEN=${PRESET_ALGOD_TOKEN}" && echo ${PRESET_ALGOD_TOKEN} > ${ALGORAND_TOKEN_PATH}
+    [ {{PAT}} = "1" ] && echo "setting ALGOD ADMIN TOKEN=${PRESET_ALGOD_ADMIN}" && echo ${PRESET_ALGOD_ADMIN} > ${ALGORAND_ADTOKEN_PATH}
     cp ${GO_ALGORAND}/installer/genesis/{{NETWORK}}/genesis.json $ALGORAND_DATA
 
 # status of network node
@@ -446,9 +453,11 @@ client-info:
     #! /usr/bin/env bash
     set -euo pipefail
     ALGORAND_TOKEN=$(cat ${ALGORAND_TOKEN_PATH})
+    ALGORAND_ADTOKEN=$(cat ${ALGORAND_ADTOKEN_PATH})
     ALGORAND_ALGOD=$(cat ${ALGORAND_ALGOD_PATH})
     ALGORAND_PID=$(cat ${ALGORAND_PID_PATH})
     echo "algod.token: ${ALGORAND_TOKEN}"
+    echo "algod.admin.token: ${ALGORAND_ADTOKEN}"
     echo "algod.net:   ${ALGORAND_ALGOD}"
     echo "algod.pid:   ${ALGORAND_PID}"
 

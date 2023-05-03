@@ -23,11 +23,8 @@ importer:
   name: algod
   config:
     mode: "follower"
-    # shouldn't we be able to specify the starting sync round?
-    # VOLATILE:
-    netaddr: "http://127.0.0.1:63135"
-    # VOLATILE:
-    token: "dc99e2f8e526dbcf2a6e362d7a3beab6db8b1b848b0268c2b269a86c96b6e1bd"
+    netaddr: "27.0.0.1:56765"
+    token: "16b29a0a2bbcc535f1e9e40f0c0888013f3789bf2bd34e7907c8fb1ae9d16024"
 
 processors:
   - name: filter_processor
