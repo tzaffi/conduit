@@ -23,8 +23,10 @@ importer:
   name: algod
   config:
     mode: "follower"
-    netaddr: "27.0.0.1:56765"
+    netaddr: "http://127.0.0.1:56765"
     token: "16b29a0a2bbcc535f1e9e40f0c0888013f3789bf2bd34e7907c8fb1ae9d16024"
+    catchup-config:
+      admin-token: "20064faacad1e590e757ac9492506c2d948633d7c458651b16a3991d26997695"
 
 processors:
   - name: filter_processor
