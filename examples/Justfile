@@ -18,6 +18,7 @@ ALGORAND_ADTOKEN_PATH := ALGORAND_DATA + "/algod.admin.token"
 ALGORAND_ALGOD_PATH := ALGORAND_DATA + "/algod.net"
 ALGORAND_PID_PATH := ALGORAND_DATA + "/algod.pid"
 
+# These fake pre-set tokens make it easier to test against a local network
 PRESET_ALGOD_TOKEN := "16b29a0a2bbcc535f1e9e40f0c0888013f3789bf2bd34e7907c8fb1ae9d16024"
 PRESET_ALGOD_ADMIN := "20064faacad1e590e757ac9492506c2d948633d7c458651b16a3991d26997695"
 
@@ -218,6 +219,7 @@ create:
 	mkdir -p $NETWORKS
 	goal network create -n $NAME -r $CURR_NETWORK -t $NODE_TEMPLATE
     
+# print out the current network's data directory tree
 @tree:
     tree $CURR_NETWORK
 
@@ -239,7 +241,7 @@ pub-validate-datadir:
 @pub-cfg-list:
     algocfg profile list
 
-# show the current network configuration@
+# show the current network configuration
 @pub-cfg-show:
     echo "cat ${ALGORAND_DATA}/config.json"
     cat ${ALGORAND_DATA}/config.json
@@ -374,7 +376,7 @@ box-app-args *ARGS:
 app-box-list $APP_ID=`just last-app-id`:
     goal app box list --app-id {{APP_ID}} --max 0
 
-# get box information for agiven app-id and box anme
+# get box information for a given app-id and box name
 app-box-info $APP_ID=`just last-app-id` $BOX="str:mybox":
     goal app box info --app-id {{APP_ID}} --name {{BOX}}
 
