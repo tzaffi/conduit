@@ -1,12 +1,12 @@
 set export
 set shell := ["zsh", "-cu"]
 
-NETWORKS := `echo $HOME` + "/networks"
-NAME := "niftynetwork"
+NETWORKS := $${NETWORKS} # parent directory of all networks
+NAME := "$${NAME}"
 CURR_NETWORK := NETWORKS + "/" + NAME
-GO_ALGORAND := "/Users/zeph/github/algorand/go-algorand"
-NODE_TEMPLATE := GO_ALGORAND + "/test/testdata/nettemplates/TwoNodesFollower100Second.json"
-PRIVATE_DATA_NODE := "Primary"
+GO_ALGORAND := "$${GO_ALGORAND}"
+NODE_TEMPLATE := GO_ALGORAND + "/test/testdata/nettemplates/$${NODE_TEMPLATE}"
+PRIVATE_DATA_NODE := "$${PRIVATE_DATA_NODE}"
 DATA_NODE := env_var_or_default("DATA_NODE", PRIVATE_DATA_NODE)
 IS_PUBLIC_TRUTHY := env_var_or_default("DATA_NODE", "")
 ALGORAND_DATA := CURR_NETWORK + "/" + DATA_NODE
