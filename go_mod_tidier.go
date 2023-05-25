@@ -13,7 +13,7 @@ const maxTries = 10
 const goMod = "go.mod"
 
 func main() {
-	nextModFile, nextSum, err := getAllAndTidyUp()
+	nextModFile, nextSum, err := getAllWithTidy()
 	if err != nil {
 		panic(fmt.Sprintf("problem with go_mod_tidier round 0: %v", err))
 	}
@@ -25,7 +25,7 @@ func main() {
 		prevModFile = nextModFile
 		prevSum = nextSum
 		var err error
-		nextModFile, nextSum, err = getAllAndTidyUp()
+		nextModFile, nextSum, err = getAllWithTidy()
 		if err != nil {
 			panic(fmt.Sprintf("problem with go_mod_tidier round %d: %v", tryNum, err))
 		}
@@ -39,7 +39,7 @@ func main() {
 	fmt.Printf("Success! go_mod_tidier took %d tries to obtain a consistent result\n", tryNum-1)
 }
 
-func getAllAndTidyUp() (*modfile.File, string, error) {
+func getAllWithTidy() (*modfile.File, string, error) {
 	goModBytes, err := ioutil.ReadFile(goMod)
 	if err != nil {
 		return nil, "", fmt.Errorf("problem reading %s: %w", goMod, err)
@@ -56,12 +56,9 @@ func getAllAndTidyUp() (*modfile.File, string, error) {
 		return mod, sum, fmt.Errorf("problem parsing %s: %w", goMod, err)
 	}
 
-	compatVersion := fmt.Sprintf("-compat=%s", mod.Go.Version)
-	fmt.Printf("go mod tidy'ing with %s\n", compatVersion)
-	cmdA := exec.Command("go", "mod", "tidy", compatVersion)
-	err = cmdA.Run()
+	err = goModTidy(mod)
 	if err != nil {
-		return mod, sum, fmt.Errorf("problem with: go mod tidy: %w", err)
+		return mod, sum, err
 	}
 
 	direct := make([]string, 0)
@@ -78,7 +75,22 @@ func getAllAndTidyUp() (*modfile.File, string, error) {
 		if err != nil {
 			return mod, sum, fmt.Errorf("problem with: go get %s: %w", pinnedPkg, err)
 		}
+		err = goModTidy(mod)
+		if err != nil {
+			return mod, sum, err
+		}
 	}
 
 	return mod, sum, nil
+}
+
+func goModTidy(mod *modfile.File) error {
+	compatVersion := fmt.Sprintf("-compat=%s", mod.Go.Version)
+	fmt.Printf("go mod tidy'ing with %s\n", compatVersion)
+	cmdA := exec.Command("go", "mod", "tidy", compatVersion)
+	err := cmdA.Run()
+	if err != nil {
+		return fmt.Errorf("problem with: go mod tidy: %w", err)
+	}
+	return nil
 }
