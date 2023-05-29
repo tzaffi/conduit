@@ -5,7 +5,7 @@ log() {
     local level=$1
     local message=$2
     local log_message
-    log_message='{"__type": "exporter", "_name": "block_hash_export.sh", "level": "'$level'", "message": "'$message'", "time": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"}'
+    log_message='{"__type": "exporter", "_name": "block_hash_exporter.sh", "level": "'$level'", "message": "'$message'", "time": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"}'
     
     if [ "$level" == "ERROR" ]; then
         echo "$log_message" >&2
@@ -42,23 +42,18 @@ init() {
 daemon() {
     # Start reading from stdin
     while IFS= read -r line; do
-        # Parse input command
+        # Parse exportData command
         command=$(echo "$line" | jq -r '.conduitCommand')
         case $command in
-            "metadata")
-                echo '{"name": "Example Binary Exporter",  "description": "Very Simplistic", "deprecated": false, "sampleConfig": "{\"output\": \"block_hash.csv\"}}'
-                ;;
             "config")
                 echo "$CONFIG_JSON"
                 ;;
             "close")
-                # Perform shutdown tasks
                 log "INFO" 'Shutting down...'
                 exit 0
                 ;;
-            "process")
-                # Process block data
-                BLOCK_DATA=$(echo "$line" | jq -r '.args.input')
+            "receive")
+                BLOCK_DATA=$(echo "$line" | jq -r '.args.exportData')
                 ROUND=$(echo "$BLOCK_DATA" | jq -r '.block.rnd')
                 PREV=$(echo "$BLOCK_DATA" | jq -r '.block.prev')
 
@@ -76,6 +71,26 @@ daemon() {
     done
 }
 
-init "$@"
+metadata() {
+    echo '{"name": "Example Binary Exporter",  "description": "Very Simplistic", "deprecated": false, "sampleConfig": "{\"output\": \"block_hash.csv\"}}'
+}
 
-daemon
+
+bhe() {
+    case $1 in
+        daemon) 
+            shift
+            init "$@"
+            daemon
+            ;;
+        metadata)
+            metadata
+            ;;
+        *)
+            log "ERROR" "Unknown command: $1"
+            exit 1 
+            ;;
+    esac
+}
+
+bhe "$@"
