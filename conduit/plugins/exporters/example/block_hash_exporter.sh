@@ -1,6 +1,13 @@
 #!/bin/bash
 set -eo pipefail
 
+EXPORTER_NAME=binary_block_hash_exporter
+DESCRIPTION="Very Simplistic"
+EXAMPLE_OUTPATH="/path/to/your/block_hash.csv"
+SAMPLE_CFG="{\\\"name\\\":\\\"${EXPORTER_NAME}\\\",\\\"output\\\": \\\"${EXAMPLE_OUTPATH}\\\"}"
+METADATA="{\"name\": \"${EXPORTER_NAME}\",  \"description\": \"${DESCRIPTION}\", \"deprecated\": false, \"sampleConfig\": \"${SAMPLE_CFG}\"}"
+
+
 log() {
     local level=$1
     local message=$2
@@ -72,7 +79,7 @@ daemon() {
 }
 
 metadata() {
-    echo '{"name": "Example Binary Exporter",  "description": "Very Simplistic", "deprecated": false, "sampleConfig": "{\"output\": \"block_hash.csv\"}}'
+    echo "$METADATA"
 }
 
 
