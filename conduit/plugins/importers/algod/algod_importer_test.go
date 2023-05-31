@@ -43,6 +43,7 @@ func New() *algodImporter {
 }
 
 func TestImporterMetadata(t *testing.T) {
+	t.Parallel()
 	testImporter := New()
 	metadata := testImporter.Metadata()
 	assert.Equal(t, metadata.Name, algodImporterMetadata.Name)
@@ -63,7 +64,12 @@ netaddr: %s
 	assert.NoError(t, err)
 }
 
-func TestInitSuccess(t *testing.T) {
+func Test_checkRounds(t *testing.T) {
+	type args struct {
+		catchpointRound uint64
+		nodeRound       uint64
+		targetRound     uint64
+	}
 	tests := []struct {
 		name      string
 		responder func(string, http.ResponseWriter) bool
@@ -235,6 +241,11 @@ netaddr: %s
 }
 
 func TestInitGenesisFailure(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	pRound := sdk.Round(1)
+	logger := logrus.New()
+
 	ts := NewAlgodServer(MakeGenesisResponder(sdk.Genesis{}))
 	testImporter := New()
 	cfgStr := fmt.Sprintf(`---
@@ -248,6 +259,11 @@ netaddr: %s
 }
 
 func TestInitUnmarshalFailure(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	pRound := sdk.Round(1)
+	logger := logrus.New()
+
 	testImporter := New()
 	_, err := testImporter.Init(ctx, conduit.MakePipelineInitProvider(&pRound, nil), plugins.MakePluginConfig("`"), logger)
 	assert.Error(t, err)
@@ -256,6 +272,7 @@ func TestInitUnmarshalFailure(t *testing.T) {
 }
 
 func TestConfigDefault(t *testing.T) {
+	t.Parallel()
 	testImporter := New()
 	expected, err := yaml.Marshal(&Config{})
 	if err != nil {
@@ -402,6 +419,7 @@ func TestGetBlockFailure(t *testing.T) {
 			ctx, cancel = context.WithCancel(context.Background())
 			testImporter := New()
 
+			testImporter := New()
 			cfgStr := fmt.Sprintf(`---
 mode: %s
 netaddr: %s
@@ -418,6 +436,7 @@ netaddr: %s
 }
 
 func TestAlgodImporter_ProvideMetrics(t *testing.T) {
+	t.Parallel()
 	testImporter := &algodImporter{}
 	assert.Len(t, testImporter.ProvideMetrics("blah"), 1)
 }

@@ -1,42 +1,37 @@
-package main
+package cli
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"os"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/cobra/doc"
 
-	"github.com/algorand/conduit/cmd/conduit/internal/initialize"
-	"github.com/algorand/conduit/cmd/conduit/internal/list"
 	"github.com/algorand/conduit/conduit/data"
 	"github.com/algorand/conduit/conduit/loggers"
 	"github.com/algorand/conduit/conduit/pipeline"
-	_ "github.com/algorand/conduit/conduit/plugins/exporters/all"
-	_ "github.com/algorand/conduit/conduit/plugins/importers/all"
-	_ "github.com/algorand/conduit/conduit/plugins/processors/all"
-	"github.com/algorand/conduit/pkg/cli"
+	"github.com/algorand/conduit/pkg/cli/internal/initialize"
+	"github.com/algorand/conduit/pkg/cli/internal/list"
 	"github.com/algorand/conduit/version"
 )
 
 var (
-	logger     *log.Logger
-	conduitCmd = makeConduitCmd()
+	logger *log.Logger
+
+	// ConduitCmd is the root command for conduit
+	ConduitCmd = MakeConduitCmd()
+
+	//Banner is the banner for conduit's pipeline
 	//go:embed banner.txt
-	banner string
+	Banner string
 )
 
 const (
 	conduitEnvVar = "CONDUIT_DATA_DIR"
 )
-
-// init() function for main package
-func init() {
-	conduitCmd.AddCommand(initialize.InitCommand)
-	conduitCmd.AddCommand(list.Command)
-}
 
 // runConduitCmdWithConfig run the main logic with a supplied conduit config
 func runConduitCmdWithConfig(args *data.Args) error {
@@ -75,7 +70,7 @@ func runConduitCmdWithConfig(args *data.Args) error {
 	logger.Info("Conduit configuration is valid")
 
 	if !pCfg.HideBanner {
-		fmt.Print(banner)
+		fmt.Print(Banner)
 	}
 
 	if pCfg.LogFile != "" {
@@ -110,8 +105,16 @@ func runConduitCmdWithConfig(args *data.Args) error {
 	return pipeline.Error()
 }
 
-// makeConduitCmd creates the main cobra command, initializes flags
-func makeConduitCmd() *cobra.Command {
+// MakeConduitCmdWithUtilities creates the main cobra command with all utilities
+func MakeConduitCmdWithUtilities() *cobra.Command {
+	cmd := MakeConduitCmd()
+	cmd.AddCommand(initialize.InitCommand)
+	cmd.AddCommand(list.Command)
+	return cmd
+}
+
+// MakeConduitCmd creates the main cobra command, initializes flags
+func MakeConduitCmd() *cobra.Command {
 	cfg := &data.Args{}
 	var vFlag bool
 	cmd := &cobra.Command{
@@ -149,26 +152,4 @@ Detailed documentation is online: https://github.com/algorand/conduit`,
 	cmd.CompletionOptions.DisableDefaultCmd = true
 
 	return cmd
-}
-
-func main() {
-	conduitCmd := cli.MakeConduitCmdWithUtilities()
-
-	// Hidden command to generate docs in a given directory
-	// conduit generate-docs [path]
-	if len(os.Args) == 3 && os.Args[1] == "generate-docs" {
-		err := doc.GenMarkdownTree(conduitCmd, os.Args[2])
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}
-
-	if err := conduitCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
-
-	os.Exit(0)
 }

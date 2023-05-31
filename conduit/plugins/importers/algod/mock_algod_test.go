@@ -7,48 +7,44 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/algorand/go-algorand-sdk/v2/client/v2/algod"
 	"github.com/algorand/go-algorand-sdk/v2/client/v2/common/models"
 	"github.com/algorand/go-algorand-sdk/v2/encoding/json"
 	"github.com/algorand/go-algorand-sdk/v2/encoding/msgpack"
 	"github.com/algorand/go-algorand-sdk/v2/types"
 )
 
+// algodCustomHandler is used by a silly muxer we created which brute forces the path and returns true if it handles the request.
+type algodCustomHandler = func(r *http.Request, w http.ResponseWriter) bool
+
 // AlgodHandler is used to handle http requests to a mock algod server
 type AlgodHandler struct {
-	responders []func(path string, w http.ResponseWriter) bool
+	responders []algodCustomHandler
 }
 
 // NewAlgodServer creates an httptest server with an algodHandler using the provided responders
-func NewAlgodServer(responders ...func(path string, w http.ResponseWriter) bool) *httptest.Server {
+func NewAlgodServer(responders ...algodCustomHandler) *httptest.Server {
 	return httptest.NewServer(&AlgodHandler{responders})
 }
 
 // NewAlgodHandler creates an AlgodHandler using the provided responders
-func NewAlgodHandler(responders ...func(path string, w http.ResponseWriter) bool) *AlgodHandler {
+func NewAlgodHandler(responders ...algodCustomHandler) *AlgodHandler {
 	return &AlgodHandler{responders}
 }
 
 // ServeHTTP implements the http.Handler interface for AlgodHandler
 func (handler *AlgodHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	for _, responder := range handler.responders {
-		if responder(req.URL.Path, w) {
+		if responder(req, w) {
 			return
 		}
 	}
 	w.WriteHeader(http.StatusBadRequest)
 }
 
-// MockAClient creates an algod client using an AlgodHandler based server
-func MockAClient(handler *AlgodHandler) (*algod.Client, error) {
-	mockServer := httptest.NewServer(handler)
-	return algod.MakeClient(mockServer.URL, "")
-}
-
 // BlockResponder handles /v2/blocks requests and returns an empty Block object
-func BlockResponder(reqPath string, w http.ResponseWriter) bool {
-	if strings.Contains(reqPath, "v2/blocks/") {
-		rnd, _ := strconv.Atoi(path.Base(reqPath))
+func BlockResponder(r *http.Request, w http.ResponseWriter) bool {
+	if strings.Contains(r.URL.Path, "v2/blocks/") {
+		rnd, _ := strconv.Atoi(path.Base(r.URL.Path))
 		type EncodedBlock struct {
 			_struct struct{}    `codec:""`
 			Block   types.Block `codec:"block"`

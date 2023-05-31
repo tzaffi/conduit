@@ -43,6 +43,8 @@ const (
 	retries = 5
 )
 
+const catchpointsURL = "https://algorand-catchpoints.s3.us-east-2.amazonaws.com/consolidated/%s_catchpoints.txt"
+
 type algodImporter struct {
 	aclient *algod.Client
 	logger  *logrus.Logger
