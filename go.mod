@@ -3,7 +3,7 @@ module github.com/algorand/conduit
 go 1.17
 
 require (
-	github.com/algorand/go-algorand-sdk/v2 v2.0.0-20230515174312-963d360c9eb7
+	github.com/algorand/go-algorand-sdk/v2 v2.0.0-20230324200319-055c8d2b174a
 	github.com/algorand/go-codec/codec v1.1.8
 	github.com/algorand/indexer v0.0.0-20230315150109-cf0074cfd4ed
 	github.com/jackc/pgx/v4 v4.13.0
@@ -68,6 +68,7 @@ require (
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect
+	github.com/yuin/goldmark v1.5.4 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.17.0 // indirect

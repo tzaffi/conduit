@@ -59,26 +59,25 @@ func BlockResponder(r *http.Request, w http.ResponseWriter) bool {
 }
 
 // MakeGenesisResponder returns a responder that will provide a specific genesis response.
-func MakeGenesisResponder(genesis types.Genesis) algodCustomHandler {
+func MakeGenesisResponder(genesis types.Genesis) func(reqPath string, w http.ResponseWriter) bool {
 	return MakeJsonResponder("/genesis", genesis)
 }
 
 // GenesisResponder handles /v2/genesis requests and returns an empty Genesis object
 var GenesisResponder = MakeGenesisResponder(types.Genesis{
 	Comment: "",
-	Network: "FAKE",
 	DevMode: true,
 })
 
-func MakeBlockAfterResponder(status models.NodeStatus) algodCustomHandler {
+func MakeBlockAfterResponder(status models.NodeStatus) func(string, http.ResponseWriter) bool {
 	return MakeJsonResponder("/wait-for-block-after", status)
 }
 
 // MakeJsonResponderSeries creates a series of responses with the provided http statuses and objects
-func MakeJsonResponderSeries(url string, responseSeries []int, responseObjects []interface{}) algodCustomHandler {
+func MakeJsonResponderSeries(url string, responseSeries []int, responseObjects []interface{}) func(string, http.ResponseWriter) bool {
 	var i, j = 0, 0
-	return func(r *http.Request, w http.ResponseWriter) bool {
-		if strings.Contains(r.URL.Path, url) {
+	return func(reqPath string, w http.ResponseWriter) bool {
+		if strings.Contains(reqPath, url) {
 			w.WriteHeader(responseSeries[i])
 			_, _ = w.Write(json.Encode(responseObjects[j]))
 			if i < len(responseSeries)-1 {
@@ -93,36 +92,26 @@ func MakeJsonResponderSeries(url string, responseSeries []int, responseObjects [
 	}
 }
 
-func MakeGetSyncRoundResponder(httpStatus int, round uint64) algodCustomHandler {
-	return MakeJsonStatusResponder("get", "/v2/ledger/sync", httpStatus, models.GetSyncRoundResponse{
-		Round: round,
-	})
+func MakeSyncRoundResponder(httpStatus int) func(string, http.ResponseWriter) bool {
+	return MakeStatusResponder("/v2/ledger/sync", httpStatus, "")
 }
 
-func MakePostSyncRoundResponder(httpStatus int) algodCustomHandler {
-	return MakeMsgpStatusResponder("post", "/v2/ledger/sync", httpStatus, "")
-}
-
-func MakeNodeStatusResponder(status models.NodeStatus) algodCustomHandler {
+func MakeNodeStatusResponder(status models.NodeStatus) func(string, http.ResponseWriter) bool {
 	return MakeJsonResponder("/v2/status", status)
 }
 
 var BlockAfterResponder = MakeBlockAfterResponder(models.NodeStatus{})
 
-func MakeLedgerStateDeltaResponder(delta types.LedgerStateDelta) algodCustomHandler {
+func MakeLedgerStateDeltaResponder(delta types.LedgerStateDelta) func(string, http.ResponseWriter) bool {
 	return MakeMsgpResponder("/v2/deltas/", delta)
 }
 
 var LedgerStateDeltaResponder = MakeLedgerStateDeltaResponder(types.LedgerStateDelta{})
 
-func MakeJsonResponder(url string, object interface{}) algodCustomHandler {
-	return MakeJsonStatusResponder("get", url, http.StatusOK, object)
-}
-
-func MakeJsonStatusResponder(method, url string, status int, object interface{}) algodCustomHandler {
-	return func(r *http.Request, w http.ResponseWriter) bool {
-		if strings.EqualFold(method, r.Method) && strings.Contains(r.URL.Path, url) {
-			w.WriteHeader(status)
+func MakeJsonResponder(url string, object interface{}) func(string, http.ResponseWriter) bool {
+	return func(reqPath string, w http.ResponseWriter) bool {
+		if strings.Contains(reqPath, url) {
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write(json.Encode(object))
 			return true
 		}
@@ -130,13 +119,20 @@ func MakeJsonStatusResponder(method, url string, status int, object interface{})
 	}
 }
 
-func MakeMsgpResponder(url string, object interface{}) algodCustomHandler {
-	return MakeMsgpStatusResponder("get", url, http.StatusOK, object)
+func MakeMsgpResponder(url string, object interface{}) func(string, http.ResponseWriter) bool {
+	return func(reqPath string, w http.ResponseWriter) bool {
+		if strings.Contains(reqPath, url) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(msgpack.Encode(object))
+			return true
+		}
+		return false
+	}
 }
 
-func MakeMsgpStatusResponder(method, url string, status int, object interface{}) algodCustomHandler {
-	return func(r *http.Request, w http.ResponseWriter) bool {
-		if strings.EqualFold(method, r.Method) && strings.Contains(r.URL.Path, url) {
+func MakeStatusResponder(url string, status int, object interface{}) func(string, http.ResponseWriter) bool {
+	return func(reqPath string, w http.ResponseWriter) bool {
+		if strings.Contains(reqPath, url) {
 			w.WriteHeader(status)
 			_, _ = w.Write(msgpack.Encode(object))
 			return true
