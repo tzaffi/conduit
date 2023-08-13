@@ -240,6 +240,29 @@ netaddr: %s
 	assert.EqualError(t, err, fmt.Sprintf("algod importer was set to a mode (%s) that wasn't supported", name))
 }
 
+func TestInitParseUrlFailure(t *testing.T) {
+	url := ".0.0.0.0.0.0.0:1234"
+	testImporter := New()
+	cfgStr := fmt.Sprintf(`---
+mode: %s
+netaddr: %s
+`, "follower", url)
+	_, err := testImporter.Init(ctx, conduit.MakePipelineInitProvider(&pRound, nil), plugins.MakePluginConfig(cfgStr), logger)
+	assert.ErrorContains(t, err, "parse")
+}
+
+func TestInitModeFailure(t *testing.T) {
+	name := "foobar"
+	ts := NewAlgodServer(GenesisResponder)
+	testImporter := New()
+	cfgStr := fmt.Sprintf(`---
+mode: %s
+netaddr: %s
+`, name, ts.URL)
+	_, err := testImporter.Init(ctx, conduit.MakePipelineInitProvider(&pRound, nil), plugins.MakePluginConfig(cfgStr), logger)
+	assert.EqualError(t, err, fmt.Sprintf("algod importer was set to a mode (%s) that wasn't supported", name))
+}
+
 func TestInitGenesisFailure(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
