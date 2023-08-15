@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -26,6 +28,8 @@ const PluginName = "file_reader"
 type fileReader struct {
 	logger *logrus.Logger
 	cfg    Config
+	gzip  bool
+	format filewriter.EncodingFormat
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -60,7 +64,6 @@ func init() {
 	jsonStrictHandle.Indent = prettyHandle.Indent
 	jsonStrictHandle.HTMLCharsAsIs = prettyHandle.HTMLCharsAsIs
 	jsonStrictHandle.MapKeyAsString = true
-
 }
 
 // New initializes an algod importer
@@ -93,19 +96,41 @@ func (r *fileReader) Init(ctx context.Context, _ data.InitProvider, cfg plugins.
 	if r.cfg.FilenamePattern == "" {
 		r.cfg.FilenamePattern = filewriter.FilePattern
 	}
+	r.gzip, r.format, err = filewriter.ParseFilenamePattern(r.cfg.FilenamePattern)
+	if err != nil {
+		return fmt.Errorf("Init() error: %w", err)
+	}
 
 	return nil
 }
 
+// func (r *fileReader) GetGenesis() (*sdk.Genesis, error) {
+// 	// TODO: should also handle fmt.Sprintf(r.cfg.FilenamePattern, 0) instead of "genesis.json"
+// 	genesisFile := path.Join(r.cfg.BlocksDir, "genesis.json")
+// 	var genesis sdk.Genesis
+// 	err := filewriter.DecodeJSONFromFile(genesisFile, &genesis, false)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("GetGenesis(): failed to process genesis file: %w", err)
+// 	}
+// 	return &genesis, nil
+// }
+
 func (r *fileReader) GetGenesis() (*sdk.Genesis, error) {
-	genesisFile := path.Join(r.cfg.BlocksDir, "genesis.json")
+	genesisFile := path.Join(r.cfg.BlocksDir, fmt.Sprintf(r.cfg.FilenamePattern, 0))
+
+	if _, err := os.Stat(genesisFile); os.IsNotExist(err) {
+		r.logger.Warnf("GetGenesis(): genesis file '%s' does not exist, trying 'genesis.json'", genesisFile)
+		genesisFile = path.Join(r.cfg.BlocksDir, "genesis.json")
+	}
+
 	var genesis sdk.Genesis
-	err := filewriter.DecodeJSONFromFile(genesisFile, &genesis, false)
+	err := filewriter.DecodeFromFile(genesisFile, &genesis, r.format, r.gzip)
 	if err != nil {
 		return nil, fmt.Errorf("GetGenesis(): failed to process genesis file: %w", err)
 	}
 	return &genesis, nil
 }
+
 
 func (r *fileReader) Close() error {
 	if r.cancel != nil {
@@ -126,24 +151,71 @@ func (r *fileReader) Close() error {
 // 	return blockData, nil
 // }
 
+
+func posErr(file string, err error) error {
+	pattern := `pos (\d+)`
+	re := regexp.MustCompile(pattern)
+
+	// Find the position
+	match := re.FindStringSubmatch(err.Error())
+	var position int
+	if len(match) > 1 {
+		var err2 error
+		position, err2 = strconv.Atoi(match[1])
+		if err2 != nil {
+			return fmt.Errorf("unable to parse position: %w, err: %w", err2, err)
+		}
+	} else {
+		return fmt.Errorf("unknown error: %w", err)
+	}
+
+	content, err2 := os.ReadFile(file)
+	if err2 != nil {
+		return fmt.Errorf("error reading file: %w, err: %w", err2, err)
+	}
+
+	radius := 20
+	start := position - radius
+	if start < 0 {
+		start = 0
+	}
+	end := position + radius
+	if end > len(content) {
+		end = len(content)
+	}
+
+	return fmt.Errorf(`error in %s @position %d: %w
+<<<<<%s>>>>>`, file, position, err, string(content[start:end]))
+}
+
 func (r *fileReader) GetBlock(rnd uint64) (data.BlockData, error) {
 	filename := path.Join(r.cfg.BlocksDir, fmt.Sprintf(r.cfg.FilenamePattern, rnd))
 	var blockData data.BlockData
 	start := time.Now()
 
 	// Read file content
-	fileContent, err := os.ReadFile(filename)
+	// fileContent, err := os.ReadFile(filename)
+	// if err != nil {
+	// 	return data.BlockData{}, fmt.Errorf("GetBlock(): unable to read block file '%s': %w", filename, err)
+	// }
+	// Decode using jsonStrictHandle
+	// decoder := codec.NewDecoderBytes(fileContent, jsonStrictHandle)
+	// err = decoder.Decode(&blockData)
+	// if err != nil {
+	// 	err = posErr(filename, err)
+	// 	return data.BlockData{}, fmt.Errorf("GetBlock(): unable to decode block file '%s': %w", filename, err)
+	// }
+
+	err := filewriter.DecodeFromFile(filename, &blockData, r.format, r.gzip)
 	if err != nil {
+		err = posErr(filename, err)
 		return data.BlockData{}, fmt.Errorf("GetBlock(): unable to read block file '%s': %w", filename, err)
 	}
 
-	// Decode using jsonStrictHandle
-	decoder := codec.NewDecoderBytes(fileContent, jsonStrictHandle)
-	err = decoder.Decode(&blockData)
-	if err != nil {
-		return data.BlockData{}, fmt.Errorf("GetBlock(): unable to decode block file '%s': %w", filename, err)
-	}
-
+	// err := filewriter.DecodeJSONFromFile(filename, &blockData, false)
+	// if err != nil {
+	// 	return data.BlockData{}, fmt.Errorf("GetBlock(): failed to process block for round %d: %w", rnd, err)
+	// }
 	r.logger.Infof("Block %d read time: %s", rnd, time.Since(start))
 	return blockData, nil
 }

@@ -18,13 +18,25 @@ import (
 const (
 	// PluginName to use when configuring.
 	PluginName = "file_writer"
+
 	// FilePattern is used to name the output files.
-	FilePattern = "%[1]d_block.json"
+	//FilePattern = "%[1]d_block.json"
+	FilePattern = "%[1]d_block.msgp.gz"
+)
+
+type EncodingFormat byte
+
+const (
+	MessagepackFormat EncodingFormat = iota
+	JSONFormat
+	UnrecognizedFormat
 )
 
 type fileExporter struct {
 	round  uint64
 	cfg    Config
+	gzip   bool
+	format EncodingFormat
 	logger *logrus.Logger
 }
 
@@ -42,6 +54,7 @@ func (exp *fileExporter) Metadata() plugins.Metadata {
 	return metadata
 }
 
+
 func (exp *fileExporter) Init(_ context.Context, initProvider data.InitProvider, cfg plugins.PluginConfig, logger *logrus.Logger) error {
 	exp.logger = logger
 	err := cfg.UnmarshalConfig(&exp.cfg)
@@ -51,6 +64,11 @@ func (exp *fileExporter) Init(_ context.Context, initProvider data.InitProvider,
 	if exp.cfg.FilenamePattern == "" {
 		exp.cfg.FilenamePattern = FilePattern
 	}
+	exp.gzip, exp.format, err = ParseFilenamePattern(exp.cfg.FilenamePattern)
+	if err != nil {
+		return fmt.Errorf("Init() error: %w", err)
+	}
+
 	// default to the data directory if no override provided.
 	if exp.cfg.BlocksDir == "" {
 		exp.cfg.BlocksDir = cfg.DataDir
@@ -87,10 +105,16 @@ func (exp *fileExporter) Receive(exportData data.BlockData) error {
 		}
 
 		blockFile := path.Join(exp.cfg.BlocksDir, fmt.Sprintf(exp.cfg.FilenamePattern, exportData.Round()))
-		err := EncodeJSONToFile(blockFile, exportData, true)
+		err := EncodeToFile(blockFile, &exportData, exp.format, exp.gzip)
 		if err != nil {
-			return fmt.Errorf("Receive(): failed to write file %s: %w", blockFile, err)
+			return fmt.Errorf("Receive(): failed to write file %s: %w", blockFile, err)	
 		}
+
+
+		// err := EncodeJSONToFile(blockFile, exportData, true)
+		// if err != nil {
+		// 	return fmt.Errorf("Receive(): failed to write file %s: %w", blockFile, err)
+		// }
 		exp.logger.Infof("Wrote block %d to %s", exportData.Round(), blockFile)
 	}
 

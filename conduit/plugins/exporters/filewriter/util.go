@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/algorand/go-algorand-sdk/v2/encoding/json"
+	"github.com/algorand/go-algorand-sdk/v2/encoding/msgpack"
 	"github.com/algorand/go-codec/codec"
 )
 
@@ -35,6 +36,95 @@ func init() {
 	jsonStrictHandle.HTMLCharsAsIs = prettyHandle.HTMLCharsAsIs
 	jsonStrictHandle.MapKeyAsString = true
 }
+
+func ParseFilenamePattern(pattern string) (bool, EncodingFormat, error) {
+	originalPattern := pattern
+	gzip := false
+	if strings.HasSuffix(pattern, ".gz") {
+		gzip = true
+		pattern = pattern[:len(pattern)-3]
+	}
+
+	var blockFormat EncodingFormat
+	if strings.HasSuffix(pattern, ".msgp") {
+		blockFormat = MessagepackFormat
+	} else if strings.HasSuffix(pattern, ".json") {
+		blockFormat = JSONFormat
+	} else {
+		return false, UnrecognizedFormat, fmt.Errorf("unrecognized export format: %s", originalPattern)
+	}
+
+	return gzip, blockFormat, nil
+}
+
+// EncodeToFile enocods an object to a file using a given format and possible gzip compression.
+func EncodeToFile(filename string, v interface{}, format EncodingFormat, isGzip bool) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("EncodeToFile(): failed to create %s: %w", filename, err)
+	}
+	defer file.Close()
+
+	var writer io.Writer
+	if isGzip {
+		gz := gzip.NewWriter(file)
+		gz.Name = filename
+		defer gz.Close()
+		writer = gz
+	} else {
+		writer = file
+	}
+
+	return Encode(format, writer, v)
+}
+
+func Encode(format EncodingFormat, writer io.Writer, v interface{}) error {
+	var encoder *codec.Encoder
+	switch format {
+	case JSONFormat:
+		encoder = codec.NewEncoder(writer, jsonStrictHandle)
+	case MessagepackFormat:
+		encoder = codec.NewEncoder(writer, msgpack.LenientCodecHandle)
+	default:
+		return fmt.Errorf("EncodeToFile(): unhandled format %d", format)
+	}
+
+	return encoder.Encode(v)
+}
+
+// DecodeFromFile decodes a file to an object using a given format and possible gzip compression.
+func DecodeFromFile(filename string, v interface{}, format EncodingFormat, isGzip bool) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return fmt.Errorf("DecodeFromFile(): failed to open %s: %w", filename, err)
+	}
+	defer file.Close()
+
+	var reader io.Reader
+	if isGzip {
+		gz, err := gzip.NewReader(file)
+		if err != nil {
+			return fmt.Errorf("DecodeFromFile(): failed to make gzip reader: %w", err)
+		}
+		defer gz.Close()
+		reader = gz
+	} else {
+		reader = file
+	}
+
+	var decoder *codec.Decoder
+	switch format {
+	case JSONFormat:
+		decoder = codec.NewDecoder(reader, jsonStrictHandle)
+	case MessagepackFormat:
+		decoder = codec.NewDecoder(reader, msgpack.LenientCodecHandle)
+	default:
+		return fmt.Errorf("DecodeFromFile(): unhandled format %d", format)
+	}
+
+	return decoder.Decode(v)
+}
+
 
 // EncodeJSONToFile is used to encode an object to a file. If the file ends in .gz it will be gzipped.
 func EncodeJSONToFile(filename string, v interface{}, pretty bool) error {

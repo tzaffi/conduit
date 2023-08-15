@@ -8,6 +8,104 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+
+func TestParseFilenameFormat(t *testing.T) {
+	testCases := []struct {
+		name     string
+		format   string
+		gzip	 bool
+		blockFormat EncodingFormat
+		err 	string
+	}{
+		{
+			name: "messagepack vanilla",
+			format: "%d_block.msgp",		
+			gzip: false,
+			blockFormat: MessagepackFormat,
+			err: "",
+		},
+		{
+			name: "messagepack gzip",
+			format: "%d_block.msgp.gz",
+			gzip: true,
+			blockFormat: MessagepackFormat,
+			err: "",
+		},
+		{
+			name: "json vanilla",
+			format: "%d_block.json",
+			gzip: false,
+			blockFormat: JSONFormat,
+			err: "",
+		},
+		{
+			name: "json gzip",	
+			format: "%d_block.json.gz",
+			gzip: true,
+			blockFormat: JSONFormat,
+			err: "",
+		},
+		{
+			name: "messagepack vanilla 2",
+			format: "%[1]d_block round%[1]d.msgp",		
+			gzip: false,
+			blockFormat: MessagepackFormat,
+			err: "",
+		},
+		{
+			name: "messagepack gzip 2",
+			format: "%[1]d_block round%[1]d.msgp.gz",
+			gzip: true,
+			blockFormat: MessagepackFormat,
+			err: "",
+		},
+		{
+			name: "json vanilla 2",
+			format: "%[1]d_block round%[1]d.json",
+			gzip: false,
+			blockFormat: JSONFormat,
+			err: "",
+		},
+		{
+			name: "json gzip 2",	
+			format: "%[1]d_block round%[1]d.json.gz",
+			gzip: true,
+			blockFormat: JSONFormat,
+			err: "",
+		},
+		{
+			name: "invalid - gzip",
+			format: "%d_block.msgp.gzip",
+			gzip: false,
+			blockFormat: UnrecognizedFormat,
+			err: "unrecognized export format",
+		},
+		{
+			name: "invalid - no extension",
+			format: "%d_block",
+			gzip: false,
+			blockFormat: UnrecognizedFormat,
+			err: "unrecognized export format",
+		},
+	}
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			gzip, blockFormat, err := ParseFilenamePattern(tc.format)
+			if tc.err == "" {	
+				require.NoError(t, err)
+				require.Equal(t, tc.gzip, gzip)
+				require.Equal(t, tc.blockFormat, blockFormat)
+			} else {
+				require.ErrorContains(t, err, tc.err)
+			}
+		})
+	}
+}
+
+
 func TestEncodeToAndFromFile(t *testing.T) {
 	tempdir := t.TempDir()
 

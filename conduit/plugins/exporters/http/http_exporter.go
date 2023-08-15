@@ -13,6 +13,7 @@ import (
 	"github.com/algorand/conduit/conduit/data"
 	"github.com/algorand/conduit/conduit/plugins"
 	"github.com/algorand/conduit/conduit/plugins/exporters"
+	"github.com/algorand/conduit/conduit/plugins/exporters/filewriter"
 	"github.com/algorand/go-algorand-sdk/v2/encoding/json"
 	"github.com/algorand/go-codec/codec"
 )
@@ -82,10 +83,10 @@ func (exp *httpExporter) Init(_ context.Context, _ data.InitProvider, cfg plugin
 	return nil
 }
 
-type receivePayload struct {
-	Round uint64          `json:"round"`
-	Blk   *data.BlockData `json:"blk"`
-	Empty bool            `json:"empty"`
+type ReceivePayload struct {
+	Round uint64          `codec:"round"`
+	Blk   *data.BlockData `codec:"blk,omitempty"`
+	Empty bool            `codec:"empty"`
 }
 
 // Close is a no-op for the httpExporter.
@@ -103,7 +104,7 @@ func (exp *httpExporter) Receive(exportData data.BlockData) error {
 		empty = true
 		blkPtr = nil
 	}
-	payload := receivePayload{
+	payload := ReceivePayload{
 		Round: round,
 		Blk:   blkPtr,
 		Empty: empty,
@@ -111,13 +112,18 @@ func (exp *httpExporter) Receive(exportData data.BlockData) error {
 
 
 	var buf bytes.Buffer
-	enc := codec.NewEncoder(&buf, jsonStrictHandle)
-	err := enc.Encode(payload)
+	// enc := codec.NewEncoder(&buf, jsonStrictHandle)
+	// err := enc.Encode(payload)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to encode payload with jsonStrictHandle: %w", err)
+	// }
+		// Assuming JSONFormat is defined somewhere in your program.
+	err := filewriter.Encode(filewriter.MessagepackFormat, &buf, payload)
 	if err != nil {
-		return fmt.Errorf("failed to encode payload with jsonStrictHandle: %w", err)
+		return fmt.Errorf("failed to encode payload as MessagepackFormat: %w", err)
 	}
 	
-	resp, err := http.Post(exp.endpoint, "application/json", &buf)
+	resp, err := http.Post(exp.endpoint, "application/msgpack", &buf)
 	if err != nil {
 		return fmt.Errorf("failed to post data to external endpoint: %w", err)
 	}

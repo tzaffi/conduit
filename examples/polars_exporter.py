@@ -1,28 +1,33 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from flask import Flask, request, jsonify
 
-ENDPOINT = "/receive"
-PORT = 1337
+from algosdk import encoding
 
-app = FastAPI()
 
-class BlockData(BaseModel):
-    round: int
-    blk: dict = None # type: ignore
-    empty: bool
+app = Flask(__name__)
 
-@app.post(ENDPOINT)
-def receive(blk_round: BlockData):
-    # request = blk_round.model_dump()
-    print(f"{blk_round=}")
+@app.route('/receive', methods=['POST'])
+def receive():
+    content_type = request.headers.get('Content-Type')
     
-    return {"success": True}
+    if content_type == "application/msgpack":
+        print("handling msgpack")
+        try:
+            decoded_data = encoding.msgpack_decode(request.data)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+
+    elif content_type == "application/json":
+        print("handling json")
+        try:
+            decoded_data = request.json
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+    else:
+        return jsonify({"error": "Unsupported content type"}), 400
+    
+    print(decoded_data)
+    
+    return jsonify({"success": True})
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
-
-
-"""
-curl -X POST http://localhost:1337/receive -H "Content-Type: application/json" -d '{"round": 1, "blk": {"someKey": "someValue"}, "empty": false}'
-"""
+    app.run(host="0.0.0.0", port=1337)
