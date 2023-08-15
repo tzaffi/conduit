@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed" // used to embed config
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 	"github.com/algorand/conduit/conduit/data"
 	"github.com/algorand/conduit/conduit/plugins"
 	"github.com/algorand/conduit/conduit/plugins/exporters"
+	"github.com/algorand/go-algorand-sdk/v2/encoding/json"
+	"github.com/algorand/go-codec/codec"
 )
 
 // PluginName to use when configuring.
@@ -36,10 +37,35 @@ var metadata = plugins.Metadata{
 	SampleConfig: sampleConfig,
 }
 
+var jsonStrictHandle, prettyHandle *codec.JsonHandle
+
 func init() {
 	exporters.Register(PluginName, exporters.ExporterConstructorFunc(func() exporters.Exporter {
 		return &httpExporter{}
 	}))
+
+	// TODO: we need a common util for these encoding across
+	// * http exporter
+	// * file writer
+	// * file reader
+	prettyHandle = new(codec.JsonHandle)
+	prettyHandle.ErrorIfNoField = json.CodecHandle.ErrorIfNoField
+	prettyHandle.ErrorIfNoArrayExpand = json.CodecHandle.ErrorIfNoArrayExpand
+	prettyHandle.Canonical = json.CodecHandle.Canonical
+	prettyHandle.RecursiveEmptyCheck = json.CodecHandle.RecursiveEmptyCheck
+	prettyHandle.Indent = json.CodecHandle.Indent
+	prettyHandle.HTMLCharsAsIs = json.CodecHandle.HTMLCharsAsIs
+	prettyHandle.MapKeyAsString = true
+	prettyHandle.Indent = 2
+
+	jsonStrictHandle = new(codec.JsonHandle)
+	jsonStrictHandle.ErrorIfNoField = prettyHandle.ErrorIfNoField
+	jsonStrictHandle.ErrorIfNoArrayExpand = prettyHandle.ErrorIfNoArrayExpand
+	jsonStrictHandle.Canonical = prettyHandle.Canonical
+	jsonStrictHandle.RecursiveEmptyCheck = prettyHandle.RecursiveEmptyCheck
+	jsonStrictHandle.Indent = prettyHandle.Indent
+	jsonStrictHandle.HTMLCharsAsIs = prettyHandle.HTMLCharsAsIs
+	jsonStrictHandle.MapKeyAsString = true
 }
 
 func (exp *httpExporter) Metadata() plugins.Metadata {
@@ -70,7 +96,7 @@ func (exp *httpExporter) Close() error {
 
 func (exp *httpExporter) Receive(exportData data.BlockData) error {
 	round := exportData.Round()
-	
+
 	blkPtr := &exportData
 	empty := false
 	if round != 0 && exportData.Empty() {
@@ -83,17 +109,19 @@ func (exp *httpExporter) Receive(exportData data.BlockData) error {
 		Empty: empty,
 	}
 
-	jsonData, err := json.Marshal(payload)
-	// TODO: IncludedTransactions is giving me a marshalling _lint_ error.
-	// https://github.com/algorand/go-algorand-sdk/blob/0865549639f0a359e2f79761203c58952d3b9532/types/statedelta.go#L224
-	if err != nil {
-		return err
-	}
 
-	resp, err := http.Post(exp.endpoint, "application/json", bytes.NewBuffer(jsonData))
+	var buf bytes.Buffer
+	enc := codec.NewEncoder(&buf, jsonStrictHandle)
+	err := enc.Encode(payload)
+	if err != nil {
+		return fmt.Errorf("failed to encode payload with jsonStrictHandle: %w", err)
+	}
+	
+	resp, err := http.Post(exp.endpoint, "application/json", &buf)
 	if err != nil {
 		return fmt.Errorf("failed to post data to external endpoint: %w", err)
 	}
+	
 
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
