@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	_ "embed" // used to embed config
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -112,18 +114,16 @@ func (exp *httpExporter) Receive(exportData data.BlockData) error {
 
 
 	var buf bytes.Buffer
-	// enc := codec.NewEncoder(&buf, jsonStrictHandle)
-	// err := enc.Encode(payload)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to encode payload with jsonStrictHandle: %w", err)
-	// }
-		// Assuming JSONFormat is defined somewhere in your program.
 	err := filewriter.Encode(filewriter.MessagepackFormat, &buf, payload)
 	if err != nil {
 		return fmt.Errorf("failed to encode payload as MessagepackFormat: %w", err)
 	}
 	
-	resp, err := http.Post(exp.endpoint, "application/msgpack", &buf)
+	encodedPayload := base64.StdEncoding.EncodeToString(buf.Bytes())
+
+
+	// TODO: should content type be "application/base64-urlsafe" ?
+	resp, err := http.Post(exp.endpoint, "application/msgpack", strings.NewReader(encodedPayload))
 	if err != nil {
 		return fmt.Errorf("failed to post data to external endpoint: %w", err)
 	}
