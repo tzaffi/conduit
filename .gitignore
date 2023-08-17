@@ -55,3 +55,6 @@ coverage.txt
 
 # conduit example
 cmd/conduit/data
+
+# python virtualenv
+.venv
