@@ -1,3 +1,6 @@
-fastapi[all]==0.101.0
+Flask==2.3.2
+deltalake==0.10.1
+glom==23.3.0
+msgpack==1.0.5
 polars==0.18.13
-uvicorn==0.23.2
+# uvicorn==0.23.2
