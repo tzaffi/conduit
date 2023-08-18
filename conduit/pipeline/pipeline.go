@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
 	"runtime/pprof"
 	"sync"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-	yaml "gopkg.in/yaml.v3"
 
 	sdk "github.com/algorand/go-algorand-sdk/v2/types"
 
@@ -103,43 +101,14 @@ func (p *pipelineImpl) registerPluginMetricsCallbacks() {
 	}
 }
 
-func MakePluginConfig(conduitArgs *data.Args, cfg data.NameConfigPair, pluginType plugins.PluginType) (plugins.PluginConfig, error) {
-	configs, err := yaml.Marshal(cfg.Config)
-	if err != nil {
-		return plugins.PluginConfig{}, fmt.Errorf("MakePluginConfig(): could not serialize config: %w", err)
-	}
-
-	var config plugins.PluginConfig
-	config.Config = string(configs)
-	if conduitArgs != nil {
-		config.DataDir = path.Join(conduitArgs.ConduitDataDir, fmt.Sprintf("%s_%s", pluginType, cfg.Name))
-		err = os.MkdirAll(config.DataDir, os.ModePerm)
-		if err != nil {
-			return plugins.PluginConfig{}, fmt.Errorf("MakePluginConfig: unable to create plugin data directory: %w", err)
-		}
-	}
-
-	return config, nil
-}
-
 // configWithLogger creates a plugin config from a name and config pair.
 // It also creates a logger for the plugin and configures it using the pipeline's log settings.
 func (p *pipelineImpl) configWithLogger(cfg data.NameConfigPair, pluginType plugins.PluginType) (*log.Logger, plugins.PluginConfig, error) {
-	// configs, err := yaml.Marshal(cfg.Config)
-	// if err != nil {
-	// 	return nil, plugins.PluginConfig{}, fmt.Errorf("makeConfig(): could not serialize config: %w", err)
-	// }
-
-	// var config plugins.PluginConfig
-	// config.Config = string(configs)
-	// if p.cfg != nil && p.cfg.ConduitArgs != nil {
-	// 	config.DataDir = path.Join(p.cfg.ConduitArgs.ConduitDataDir, fmt.Sprintf("%s_%s", pluginType, cfg.Name))
-	// 	err = os.MkdirAll(config.DataDir, os.ModePerm)
-	// 	if err != nil {
-	// 		return nil, plugins.PluginConfig{}, fmt.Errorf("makeConfig: unable to create plugin data directory: %w", err)
-	// 	}
-	// }
-	config, err := MakePluginConfig(p.cfg.ConduitArgs, cfg, pluginType)
+	var dataDir string
+	if p.cfg.ConduitArgs != nil {
+		dataDir = p.cfg.ConduitArgs.ConduitDataDir
+	}
+	config, err := pluginType.GetConfig(cfg, dataDir)
 	if err != nil {
 		return nil, plugins.PluginConfig{}, fmt.Errorf("configWithLogger(): unable to create plugin config: %w", err)
 	}

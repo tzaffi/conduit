@@ -15,7 +15,6 @@ import (
 
 	"github.com/algorand/conduit/conduit"
 	"github.com/algorand/conduit/conduit/data"
-	"github.com/algorand/conduit/conduit/pipeline"
 	"github.com/algorand/conduit/conduit/plugins"
 	"github.com/algorand/conduit/conduit/plugins/exporters"
 	"github.com/algorand/conduit/conduit/plugins/exporters/filewriter"
@@ -108,9 +107,7 @@ func TestRoundTrip(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	logger, hook := logrusTest.NewNullLogger()
-	// TODO: should we use the hook to assert logs?
-	_ = hook
+	logger, _ := logrusTest.NewNullLogger()
 
 	// Assert configurations:
 	require.Equal(t, "file_reader", plineConfig.Importer.Name)
@@ -129,7 +126,7 @@ func TestRoundTrip(t *testing.T) {
 	impCtor, err := importers.ImporterConstructorByName(plineConfig.Importer.Name)
 	require.NoError(t, err)
 	importer := impCtor.New()
-	impConfig, err := pipeline.MakePluginConfig(plineConfig.ConduitArgs, plineConfig.Importer, plugins.Importer)
+	impConfig, err := plugins.Importer.GetConfig(plineConfig.Importer, conduitDataDir)
 	require.NoError(t, err)
 	require.Equal(t, path.Join(conduitDataDir, "importer_file_reader"), impConfig.DataDir)
 
@@ -159,7 +156,7 @@ func TestRoundTrip(t *testing.T) {
 	expCtor, err := exporters.ExporterConstructorByName(plineConfig.Exporter.Name)
 	require.NoError(t, err)
 	exporter := expCtor.New()
-	expConfig, err := pipeline.MakePluginConfig(plineConfig.ConduitArgs, plineConfig.Exporter, plugins.Exporter)
+	expConfig, err := plugins.Exporter.GetConfig(plineConfig.Exporter, conduitDataDir)
 	require.NoError(t, err)
 	require.Equal(t, path.Join(conduitDataDir, "exporter_file_writer"), expConfig.DataDir)
 
