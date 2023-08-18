@@ -1,11 +1,13 @@
 package fileimporter
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	logrusTest "github.com/sirupsen/logrus/hooks/test"
@@ -28,28 +30,45 @@ const (
 	exporterBlockDir = "test_resources/conduit_data/exporter_file_writer"
 )
 
-// numFiles returns the number of files in the importerBlockDir including genesis.
-// This assumes that there are no subdirectories.
-func numFiles(t *testing.T) uint64 {
+func cleanArtifacts(t *testing.T) {
+	err := os.RemoveAll(exporterBlockDir)
+	require.NoError(t, err)
+}
+
+// numGzippedFiles returns the number of files in the importerBlockDir 
+// whose filename ends in .gz
+func numGzippedFiles(t *testing.T) uint64 {
 	files, err := os.ReadDir(importerBlockDir)
 	require.NoError(t, err)
 
-	return uint64(len(files))
+	gzCount := uint64(0)
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".gz") {
+			gzCount++
+		}
+	}
+	
+	return gzCount
 }
 
-func fileInfo(t *testing.T, path string) (os.FileInfo, *os.File){
-	fileInfo, err := os.Stat(path)
-	require.NoError(t, err, "error accessing file %s", path)
 
+func uncompressBytes(t *testing.T, path string) []byte {
 	file, err := os.Open(path)
 	require.NoError(t, err, "error opening file %s", path)
+	defer file.Close()
 
-	return fileInfo, file
+	gr, err := gzip.NewReader(file)
+	require.NoError(t, err, "error creating gzip reader for file %s", path)
+	defer gr.Close()
+
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(gr)
+	require.NoError(t, err, "error reading file %s", path)
+
+	return buf.Bytes()
 }
 
-
-func identicalFiles(t *testing.T, path1, path2 string) {
-	var fileInfo1, fileInfo2 os.FileInfo
+func identicalFilesUncompressed(t *testing.T, path1, path2 string) {
 	var file1, file2 *os.File
 
 	defer func() {
@@ -61,46 +80,24 @@ func identicalFiles(t *testing.T, path1, path2 string) {
 		}
 	}()
 
-	fileInfo1, file1 = fileInfo(t, path1)
-	fileInfo2, file2 = fileInfo(t, path2)
-	require.Equal(t, fileInfo1.Size(), fileInfo2.Size())
+	bytes1 := uncompressBytes(t, path1)
+	bytes2 := uncompressBytes(t, path2)
+	require.Equal(t, len(bytes1), len(bytes2), "files %s and %s have different lengths", path1, path2)
 
-	buffer1 := make([]byte, 4096)
-	buffer2 := make([]byte, 4096)
-
-	for idx := 0; ; idx++{
-		msg := fmt.Sprintf("files: %s v %s, buffer beginning at offest %d", path1, path2, 4096 * idx)
-		n1, err1 := io.ReadFull(file1, buffer1)
-		n2, err2 := io.ReadFull(file2, buffer2)
-
-		require.Equal(t, n1, n2, msg)
-
-		if err1 != nil {
-			require.ErrorIs(t, err1, io.EOF, msg)
-			require.ErrorIs(t, err2, io.EOF, msg)
-		}
-
-		require.Equal(t, buffer1[:n1], buffer2[:n2], msg)
+	for i, b1 := range bytes1 {
+		b2 := bytes2[i]
+		require.Equal(t, b1, b2, "files %s and %s differ at byte %d (%s) v (%s)", path1, path2, i, string(b1), string(b2))
 	}
 }
-
-
-// func pluginConfig(t *testing.T, cfg data.NameConfigPair, dataDir string) plugins.PluginConfig {
-// 	config, err := yaml.Marshal(cfg.Config)
-// 	require.NoError(t, err)
-
-// 	return plugins.PluginConfig{
-// 		DataDir: dataDir,
-// 		Config:  string(config),
-// 	}
-// }
 
 // TestRoundTrip tests that blocks read by the filereader importer
 // under the msgp.gz encoding are written to identical files by the filewriter exporter.
 // This includes both a genesis block and a round-0 block with differend encodings.
 func TestRoundTrip(t *testing.T) {
+	cleanArtifacts(t)
+
 	round := sdk.Round(0)
-	lastRound := numFiles(t) - 2 // subtracd round-0 and the separate genesis file
+	lastRound := numGzippedFiles(t) - 2 // subtract round-0 and the separate genesis file
 	require.GreaterOrEqual(t, lastRound, uint64(1))
 	require.LessOrEqual(t, lastRound, uint64(1000)) // overflow sanity check
 
@@ -114,7 +111,6 @@ func TestRoundTrip(t *testing.T) {
 	logger, hook := logrusTest.NewNullLogger()
 	// TODO: should we use the hook to assert logs?
 	_ = hook
-
 
 	// Assert configurations:
 	require.Equal(t, "file_reader", plineConfig.Importer.Name)
@@ -157,7 +153,6 @@ func TestRoundTrip(t *testing.T) {
 
 	require.Equal(t, impGenesis, genesis)
 
-
 	initProvider.SetGenesis(impGenesis)
 
 	// Construct the exporter
@@ -174,25 +169,26 @@ func TestRoundTrip(t *testing.T) {
 	// It should have persisted the genesis which ought to be identical
 	// to the importer's.
 	expGenesisPath := path.Join(exporterBlockDir, genesisFile)
-	identicalFiles(t, impGenesisPath, expGenesisPath)
-	
+	identicalFilesUncompressed(t, impGenesisPath, expGenesisPath)
 
-
-	// Run the pipeline
+	// Simulate the pipeline
 	require.Equal(t, sdk.Round(0), round)
 	for ; uint64(round) <= lastRound; round++ {
 		blk, err := importer.GetBlock(uint64(round))
 		require.NoError(t, err)
 
-		if round == 0 {
-			require.Equal(t, impGenesis, blk)
-		}
-
-		file, err := os.OpenFile(exporterBlockDir + "/" + fmt.Sprintf(filePattern, round), os.O_RDONLY, 0)
+		expBlockPath := path.Join(exporterBlockDir, fmt.Sprintf(filePattern, round))
+		_, err = os.OpenFile(expBlockPath, os.O_RDONLY, 0)
 		require.ErrorIs(t, err, os.ErrNotExist)
-		_ = file
 
+		err = exporter.Receive(blk)
+		require.NoError(t, err)
+
+		_, err = os.OpenFile(expBlockPath, os.O_RDONLY, 0)
+		require.NoError(t, err)
+
+		impBlockBath := path.Join(importerBlockDir, fmt.Sprintf(filePattern, round)) 
+
+		identicalFilesUncompressed(t, impBlockBath, expBlockPath)
 	}
-
-
 }
