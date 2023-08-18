@@ -15,10 +15,10 @@ import (
 
 // TODO: this test is currently just a copy/pasta of the noop exporter test
 
-var nc = exporters.ExporterConstructorFunc(func() exporters.Exporter {
+var hc = exporters.ExporterConstructorFunc(func() exporters.Exporter {
 	return &httpExporter{}
 })
-var ne = nc.New()
+var he = hc.New()
 
 func TestExporterBuilderByName(t *testing.T) {
 	// init() has already registered the noop exporter
@@ -30,25 +30,26 @@ func TestExporterBuilderByName(t *testing.T) {
 }
 
 func TestExporterMetadata(t *testing.T) {
-	meta := ne.Metadata()
+	meta := he.Metadata()
 	assert.Equal(t, metadata.Name, meta.Name)
 	assert.Equal(t, metadata.Description, meta.Description)
 	assert.Equal(t, metadata.Deprecated, meta.Deprecated)
 }
 
 func TestExporterInit(t *testing.T) {
-	assert.NoError(t, ne.Init(context.Background(), &conduit.PipelineInitProvider{}, plugins.MakePluginConfig(""), nil))
+	assert.NoError(t, he.Init(context.Background(), &conduit.PipelineInitProvider{}, plugins.MakePluginConfig(""), nil))
 }
 
 func TestExporterClose(t *testing.T) {
-	assert.NoError(t, ne.Close())
+	assert.NoError(t, he.Close())
 }
 
 func TestExporterRoundReceive(t *testing.T) {
+	// TODO: to pass this test need to start up an http server that can handle the requests
 	eData := data.BlockData{
 		BlockHeader: sdk.BlockHeader{
 			Round: 5,
 		},
 	}
-	assert.NoError(t, ne.Receive(eData))
+	assert.NoError(t, he.Receive(eData))
 }
