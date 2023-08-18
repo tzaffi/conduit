@@ -82,7 +82,21 @@ func (exp *fileExporter) Init(_ context.Context, initProvider data.InitProvider,
 		return fmt.Errorf("Init() error: %w", err)
 	}
 	exp.round = uint64(initProvider.NextDBRound())
-	return err
+
+	// export the genesis as well in the same format
+	genesis := initProvider.GetGenesis()
+	genesisFile, err := GenesisFilename(exp.format, exp.gzip)
+	if err != nil {
+		return fmt.Errorf("Init() error: %w", err)
+	}
+
+	genesisPath := path.Join(exp.cfg.BlocksDir, genesisFile)
+	err = EncodeToFile(genesisPath, genesis, exp.format, exp.gzip)
+	if err != nil {
+		return fmt.Errorf("Init() error sending to genesisPath=%s: %w", genesisPath, err)
+	}
+
+	return nil
 }
 
 func (exp *fileExporter) Close() error {
