@@ -20,7 +20,6 @@ const (
 	PluginName = "file_writer"
 
 	// FilePattern is used to name the output files.
-	//FilePattern = "%[1]d_block.json"
 	FilePattern = "%[1]d_block.msgp.gz"
 )
 
@@ -53,7 +52,6 @@ var metadata = plugins.Metadata{
 func (exp *fileExporter) Metadata() plugins.Metadata {
 	return metadata
 }
-
 
 func (exp *fileExporter) Init(_ context.Context, initProvider data.InitProvider, cfg plugins.PluginConfig, logger *logrus.Logger) error {
 	exp.logger = logger
@@ -121,14 +119,9 @@ func (exp *fileExporter) Receive(exportData data.BlockData) error {
 		blockFile := path.Join(exp.cfg.BlocksDir, fmt.Sprintf(exp.cfg.FilenamePattern, exportData.Round()))
 		err := EncodeToFile(blockFile, &exportData, exp.format, exp.gzip)
 		if err != nil {
-			return fmt.Errorf("Receive(): failed to write file %s: %w", blockFile, err)	
+			return fmt.Errorf("Receive(): failed to write file %s: %w", blockFile, err)
 		}
 
-
-		// err := EncodeJSONToFile(blockFile, exportData, true)
-		// if err != nil {
-		// 	return fmt.Errorf("Receive(): failed to write file %s: %w", blockFile, err)
-		// }
 		exp.logger.Infof("Wrote block %d to %s", exportData.Round(), blockFile)
 	}
 

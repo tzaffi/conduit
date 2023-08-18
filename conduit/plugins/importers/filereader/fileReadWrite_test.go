@@ -34,7 +34,7 @@ func cleanArtifacts(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// numGzippedFiles returns the number of files in the importerBlockDir 
+// numGzippedFiles returns the number of files in the importerBlockDir
 // whose filename ends in .gz
 func numGzippedFiles(t *testing.T) uint64 {
 	files, err := os.ReadDir(importerBlockDir)
@@ -46,10 +46,9 @@ func numGzippedFiles(t *testing.T) uint64 {
 			gzCount++
 		}
 	}
-	
+
 	return gzCount
 }
-
 
 func uncompressBytes(t *testing.T, path string) []byte {
 	file, err := os.Open(path)
@@ -184,7 +183,7 @@ func TestRoundTrip(t *testing.T) {
 		_, err = os.OpenFile(expBlockPath, os.O_RDONLY, 0)
 		require.NoError(t, err)
 
-		impBlockBath := path.Join(importerBlockDir, fmt.Sprintf(filePattern, round)) 
+		impBlockBath := path.Join(importerBlockDir, fmt.Sprintf(filePattern, round))
 
 		identicalFilesUncompressed(t, impBlockBath, expBlockPath)
 	}
