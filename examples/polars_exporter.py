@@ -1,5 +1,5 @@
 import base64
-from dataclasses import asdict, dataclass, fields, is_dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 import os
 from pathlib import Path
 # import shutil

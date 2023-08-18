@@ -12,9 +12,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/algorand/go-algorand-sdk/v2/encoding/json"
 	sdk "github.com/algorand/go-algorand-sdk/v2/types"
-	"github.com/algorand/go-codec/codec"
 
 	"github.com/algorand/conduit/conduit/data"
 	"github.com/algorand/conduit/conduit/plugins"
@@ -34,36 +32,11 @@ type fileReader struct {
 	cancel context.CancelFunc
 }
 
-var jsonStrictHandle, prettyHandle *codec.JsonHandle
-
 // package-wide init function
 func init() {
 	importers.Register(PluginName, importers.ImporterConstructorFunc(func() importers.Importer {
 		return &fileReader{}
 	}))
-
-	// TODO: we need a common util for these encoding across
-	// * http exporter
-	// * file writer
-	// * file reader
-	prettyHandle = new(codec.JsonHandle)
-	prettyHandle.ErrorIfNoField = json.CodecHandle.ErrorIfNoField
-	prettyHandle.ErrorIfNoArrayExpand = json.CodecHandle.ErrorIfNoArrayExpand
-	prettyHandle.Canonical = json.CodecHandle.Canonical
-	prettyHandle.RecursiveEmptyCheck = json.CodecHandle.RecursiveEmptyCheck
-	prettyHandle.Indent = json.CodecHandle.Indent
-	prettyHandle.HTMLCharsAsIs = json.CodecHandle.HTMLCharsAsIs
-	prettyHandle.MapKeyAsString = true
-	prettyHandle.Indent = 2
-
-	jsonStrictHandle = new(codec.JsonHandle)
-	jsonStrictHandle.ErrorIfNoField = prettyHandle.ErrorIfNoField
-	jsonStrictHandle.ErrorIfNoArrayExpand = prettyHandle.ErrorIfNoArrayExpand
-	jsonStrictHandle.Canonical = prettyHandle.Canonical
-	jsonStrictHandle.RecursiveEmptyCheck = prettyHandle.RecursiveEmptyCheck
-	jsonStrictHandle.Indent = prettyHandle.Indent
-	jsonStrictHandle.HTMLCharsAsIs = prettyHandle.HTMLCharsAsIs
-	jsonStrictHandle.MapKeyAsString = true
 }
 
 // New initializes an algod importer
@@ -174,28 +147,11 @@ func (r *fileReader) GetBlock(rnd uint64) (data.BlockData, error) {
 	start := time.Now()
 
 	// Read file content
-	// fileContent, err := os.ReadFile(filename)
-	// if err != nil {
-	// 	return data.BlockData{}, fmt.Errorf("GetBlock(): unable to read block file '%s': %w", filename, err)
-	// }
-	// Decode using jsonStrictHandle
-	// decoder := codec.NewDecoderBytes(fileContent, jsonStrictHandle)
-	// err = decoder.Decode(&blockData)
-	// if err != nil {
-	// 	err = posErr(filename, err)
-	// 	return data.BlockData{}, fmt.Errorf("GetBlock(): unable to decode block file '%s': %w", filename, err)
-	// }
-
 	err := filewriter.DecodeFromFile(filename, &blockData, r.format, r.gzip)
 	if err != nil {
 		err = posErr(filename, err)
 		return data.BlockData{}, fmt.Errorf("GetBlock(): unable to read block file '%s': %w", filename, err)
 	}
-
-	// err := filewriter.DecodeJSONFromFile(filename, &blockData, false)
-	// if err != nil {
-	// 	return data.BlockData{}, fmt.Errorf("GetBlock(): failed to process block for round %d: %w", rnd, err)
-	// }
 	r.logger.Infof("Block %d read time: %s", rnd, time.Since(start))
 	return blockData, nil
 }

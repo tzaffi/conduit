@@ -12,28 +12,18 @@ import (
 	"github.com/algorand/go-codec/codec"
 )
 
-var prettyHandle *codec.JsonHandle
-var jsonStrictHandle *codec.JsonHandle
+var jsonPrettyHandle *codec.JsonHandle
 
 func init() {
-	prettyHandle = new(codec.JsonHandle)
-	prettyHandle.ErrorIfNoField = json.CodecHandle.ErrorIfNoField
-	prettyHandle.ErrorIfNoArrayExpand = json.CodecHandle.ErrorIfNoArrayExpand
-	prettyHandle.Canonical = json.CodecHandle.Canonical
-	prettyHandle.RecursiveEmptyCheck = json.CodecHandle.RecursiveEmptyCheck
-	prettyHandle.Indent = json.CodecHandle.Indent
-	prettyHandle.HTMLCharsAsIs = json.CodecHandle.HTMLCharsAsIs
-	prettyHandle.MapKeyAsString = true
-	prettyHandle.Indent = 2
-
-	jsonStrictHandle = new(codec.JsonHandle)
-	jsonStrictHandle.ErrorIfNoField = prettyHandle.ErrorIfNoField
-	jsonStrictHandle.ErrorIfNoArrayExpand = prettyHandle.ErrorIfNoArrayExpand
-	jsonStrictHandle.Canonical = prettyHandle.Canonical
-	jsonStrictHandle.RecursiveEmptyCheck = prettyHandle.RecursiveEmptyCheck
-	jsonStrictHandle.Indent = prettyHandle.Indent
-	jsonStrictHandle.HTMLCharsAsIs = prettyHandle.HTMLCharsAsIs
-	jsonStrictHandle.MapKeyAsString = true
+	jsonPrettyHandle = new(codec.JsonHandle)
+	jsonPrettyHandle.ErrorIfNoField = json.CodecHandle.ErrorIfNoField
+	jsonPrettyHandle.ErrorIfNoArrayExpand = json.CodecHandle.ErrorIfNoArrayExpand
+	jsonPrettyHandle.Canonical = json.CodecHandle.Canonical
+	jsonPrettyHandle.RecursiveEmptyCheck = json.CodecHandle.RecursiveEmptyCheck
+	jsonPrettyHandle.Indent = json.CodecHandle.Indent
+	jsonPrettyHandle.HTMLCharsAsIs = json.CodecHandle.HTMLCharsAsIs
+	jsonPrettyHandle.MapKeyAsString = true
+	jsonPrettyHandle.Indent = 2
 }
 
 func ParseFilenamePattern(pattern string) (EncodingFormat, bool, error) {
@@ -100,7 +90,7 @@ func Encode(format EncodingFormat, writer io.Writer, v interface{}) error {
 	var handle codec.Handle
 	switch format {
 	case JSONFormat:
-		handle = prettyHandle
+		handle = jsonPrettyHandle
 	case MessagepackFormat:
 		handle = msgpack.LenientCodecHandle
 	default:
