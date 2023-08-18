@@ -78,7 +78,7 @@ func (r *fileReader) Init(ctx context.Context, _ data.InitProvider, cfg plugins.
 }
 
 // GetGenesis returns the genesis. Is is assumed that
-// the genesis file is available __in addition__ the round 0 block file.
+// the genesis file is available __in addition to__ the round 0 block file.
 // This is because a the encoding assumed for the genesis is different
 // from the encoding assumed for blocks.
 // TODO: handle the case of a multipurpose file that contains both encodings.
