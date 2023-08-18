@@ -1,7 +1,7 @@
 package filewriter
 
 import (
-	"io/ioutil"
+	"os"
 	"path"
 	"testing"
 
@@ -93,7 +93,7 @@ func TestParseFilenameFormat(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			gzip, blockFormat, err := ParseFilenamePattern(tc.format)
+			blockFormat, gzip, err := ParseFilenamePattern(tc.format)
 			if tc.err == "" {	
 				require.NoError(t, err)
 				require.Equal(t, tc.gzip, gzip)
@@ -175,16 +175,17 @@ func TestEncodeToAndFromFile(t *testing.T) {
 	}
 
 	{
-		pretty := path.Join(tempdir, "pretty.json")
-		err := EncodeJSONToFile(pretty, data, true)
+		jsonFile := path.Join(tempdir, "json.json")
+		err := EncodeToFile(jsonFile, data, JSONFormat, false)
 		require.NoError(t, err)
-		require.FileExists(t, pretty)
+		require.FileExists(t, jsonFile)
 		var testDecode test
-		err = DecodeJSONFromFile(pretty, &testDecode, false)
+		err = DecodeFromFile(jsonFile, &testDecode, JSONFormat, false)
+		require.NoError(t, err)
 		require.Equal(t, data, testDecode)
 
 		// Check the pretty printing
-		bytes, err := ioutil.ReadFile(pretty)
+		bytes, err := os.ReadFile(jsonFile)
 		require.NoError(t, err)
 		require.Contains(t, string(bytes), "  \"one\": \"one\",\n")
 		require.Contains(t, string(bytes), `"0": "int-key"`)
@@ -192,22 +193,24 @@ func TestEncodeToAndFromFile(t *testing.T) {
 
 	{
 		small := path.Join(tempdir, "small.json")
-		err := EncodeJSONToFile(small, data, false)
+		err := EncodeToFile(small, data, JSONFormat, false)
 		require.NoError(t, err)
 		require.FileExists(t, small)
 		var testDecode test
-		err = DecodeJSONFromFile(small, &testDecode, false)
+		err = DecodeFromFile(small, &testDecode, JSONFormat, false)
+		require.NoError(t, err)
 		require.Equal(t, data, testDecode)
 	}
 
 	// gzip test
 	{
 		small := path.Join(tempdir, "small.json.gz")
-		err := EncodeJSONToFile(small, data, false)
+		err := EncodeToFile(small, data, JSONFormat, true)
 		require.NoError(t, err)
 		require.FileExists(t, small)
 		var testDecode test
-		err = DecodeJSONFromFile(small, &testDecode, false)
+		err = DecodeFromFile(small, &testDecode, JSONFormat, true)
+		require.NoError(t, err)
 		require.Equal(t, data, testDecode)
 	}
 }

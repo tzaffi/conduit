@@ -93,6 +93,7 @@ func identicalFilesUncompressed(t *testing.T, path1, path2 string) {
 // This includes both a genesis block and a round-0 block with differend encodings.
 func TestRoundTrip(t *testing.T) {
 	cleanArtifacts(t)
+	defer cleanArtifacts(t)
 
 	round := sdk.Round(0)
 	lastRound := numGzippedFiles(t) - 2 // subtract round-0 and the separate genesis file

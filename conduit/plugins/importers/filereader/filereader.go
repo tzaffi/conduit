@@ -96,7 +96,7 @@ func (r *fileReader) Init(ctx context.Context, _ data.InitProvider, cfg plugins.
 	if r.cfg.FilenamePattern == "" {
 		r.cfg.FilenamePattern = filewriter.FilePattern
 	}
-	r.gzip, r.format, err = filewriter.ParseFilenamePattern(r.cfg.FilenamePattern)
+	r.format, r.gzip, err = filewriter.ParseFilenamePattern(r.cfg.FilenamePattern)
 	if err != nil {
 		return fmt.Errorf("Init() error: %w", err)
 	}

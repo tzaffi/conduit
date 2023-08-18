@@ -21,6 +21,12 @@ import (
 	sdk "github.com/algorand/go-algorand-sdk/v2/types"
 )
 
+const (
+	defaultEncodingFormat = filewriter.MessagepackFormat
+	defaultIsGzip         = true
+)
+
+
 var (
 	logger       *logrus.Logger
 	testImporter importers.Importer
@@ -33,6 +39,12 @@ func init() {
 	logger.SetLevel(logrus.InfoLevel)
 	pRound = sdk.Round(1)
 }
+
+func TestDefaults(t *testing.T) {
+	require.Equal(t, defaultEncodingFormat, filewriter.MessagepackFormat)
+	require.Equal(t, defaultIsGzip, true)
+}
+
 
 func TestImporterorterMetadata(t *testing.T) {
 	testImporter = New()
@@ -54,7 +66,10 @@ func initializeTestData(t *testing.T, dir string, numRounds int) sdk.Genesis {
 		Timestamp:   1234,
 	}
 
-	err := filewriter.EncodeJSONToFile(path.Join(dir, "genesis.json"), genesisA, true)
+	genesisFilename, err := filewriter.GenesisFilename(defaultEncodingFormat, defaultIsGzip)
+	require.NoError(t, err)
+
+	err = filewriter.EncodeToFile(path.Join(dir, genesisFilename), genesisA, defaultEncodingFormat, defaultIsGzip)
 	require.NoError(t, err)
 
 	for i := 0; i < numRounds; i++ {
@@ -67,7 +82,7 @@ func initializeTestData(t *testing.T, dir string, numRounds int) sdk.Genesis {
 			Certificate: nil,
 		}
 		blockFile := path.Join(dir, fmt.Sprintf(filewriter.FilePattern, i))
-		err = filewriter.EncodeJSONToFile(blockFile, block, true)
+		err = filewriter.EncodeToFile(blockFile, block, defaultEncodingFormat, defaultIsGzip)
 		require.NoError(t, err)
 	}
 

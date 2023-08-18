@@ -62,7 +62,7 @@ func (exp *fileExporter) Init(_ context.Context, initProvider data.InitProvider,
 	if exp.cfg.FilenamePattern == "" {
 		exp.cfg.FilenamePattern = FilePattern
 	}
-	exp.gzip, exp.format, err = ParseFilenamePattern(exp.cfg.FilenamePattern)
+	exp.format, exp.gzip, err = ParseFilenamePattern(exp.cfg.FilenamePattern)
 	if err != nil {
 		return fmt.Errorf("Init() error: %w", err)
 	}
@@ -117,6 +117,7 @@ func (exp *fileExporter) Receive(exportData data.BlockData) error {
 		}
 
 		blockFile := path.Join(exp.cfg.BlocksDir, fmt.Sprintf(exp.cfg.FilenamePattern, exportData.Round()))
+
 		err := EncodeToFile(blockFile, &exportData, exp.format, exp.gzip)
 		if err != nil {
 			return fmt.Errorf("Receive(): failed to write file %s: %w", blockFile, err)
