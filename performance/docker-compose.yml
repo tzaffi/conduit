@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  postgres:
+    image: postgres
+    container_name: performance_pg
+    ports:
+      - "65432:5432"
+    environment:
+      POSTGRES_PASSWORD: algorand
+      POSTGRES_USER: algorand
+      POSTGRES_DB: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+    command: 
+      -c shared_preload_libraries='pg_stat_statements'
+      # pg logs for the stress test with 10 blocks was 3 GB which
+      # interfered with performance measurements
+      # -c log_statement='all'
+      # -c log_duration=on
+      # -c log_min_duration_statement=0

@@ -1,0 +1,28 @@
+log-level: info
+log-file: conduit.log
+retry-count: 1
+retry-delay: "1s"
+#pid-filepath: /path/to/pidfile
+hide-banner: true
+metrics:
+    mode: ON
+    addr: ":9999"
+    prefix: "conduit"
+importer:
+    name: file_reader
+    config:
+        # assumes we run conduit inside of the `performance/` directory:
+        block-dir: "filereader_blocks"
+        filename-pattern: "%[1]d_block.msgp.gz"
+processors:
+exporter:
+  name: postgresql
+  config:
+    connection-string: "host=localhost user=algorand password=algorand dbname=performance_db port=65432 sslmode=disable"
+    max-conn: 20
+telemetry:
+  enabled: false
+  # uri: ""
+  # index: ""
+  # username: ""
+  # password: ""
