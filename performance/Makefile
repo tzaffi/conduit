@@ -2,45 +2,24 @@ random := $(shell echo $$RANDOM)
 PGCONT = performance_pg
 PGUSER = algorand
 PGDB = performance_db # postgres
-PGCONN = postgresql://algorand:algorand@localhost:65432/performance_db
 PGLOGS = pg.log
 CONDUIT = ../cmd/conduit/conduit
 
-define QUERY_TOTAL_TIME
--c "SELECT substring(trim(regexp_replace(regexp_replace(query, '--.*?$$', '', 'gn'), '\\s+', ' ', 'g')), 1, 50) as query, \
-round(total_exec_time::numeric, 2) AS total_time, \
-calls, \
-round(mean_exec_time::numeric, 2) AS mean, \
-round((100 * total_exec_time / sum(total_exec_time::numeric) OVER ())::numeric, 2) AS percentage_cpu \
-FROM pg_stat_statements \
-ORDER BY total_exec_time DESC \
-LIMIT 10;"
-endef
+nuke: pg-down clean
 
-define QUERY_SLOWEST
--c "SELECT userid::regrole, dbid, \
-    substring(trim(regexp_replace(regexp_replace(query, '--.*?$$', '', 'gn'), '\\s+', ' ', 'g')), 1, 50) as query, \
-    calls, total_exec_time/1000 as total_time_seconds, min_exec_time/1000 as min_time_seconds, \
-    max_exec_time/1000 as max_time_seconds, mean_exec_time/1000 as mean_time_seconds \
-FROM pg_stat_statements \
-ORDER BY mean_exec_time DESC \
-LIMIT 10;"
-endef
+nuke-and-run: nuke perf-run
 
-define QUERY_MEMHOG
--c "SELECT userid::regrole, dbid, \
-	substring(trim(regexp_replace(regexp_replace(query, '--.*?$$', '', 'gn'), '\\s+', ' ', 'g')), 1, 50) as query, \
-    (shared_blks_hit+shared_blks_dirtied) as memory_usage  \
-FROM pg_stat_statements \
-ORDER BY (shared_blks_hit+shared_blks_dirtied) DESC \
-LIMIT 10;"
-endef
+nuke-and-debug: nuke pg-up
+	mv ../cmd/conduit/conduit.log "../cmd/conduit/conduit_$(random).log" || true
 
-
-perf-run: clean pg-up run-conduit
+perf-run: pg-up run-conduit
 
 clean: # pg-down should be called manually
 	rm conduit_data/metadata.json || true
+
+clean-go-cache:
+	cd .. && go clean -cache -testcache -modcache
+
 
 pg-up: save-logs
 	docker-compose up -d
@@ -49,6 +28,9 @@ pg-up: save-logs
 	docker exec -it $(PGCONT) psql -U algorand -d postgres -c "create database $(PGDB);"
 	make pg-query QUERY="-c \"CREATE EXTENSION pg_stat_statements;\""
 
+pg-down:
+	docker-compose down
+
 pg-logs-tail:
 	docker-compose logs -f > $(PGLOGS) &
 
@@ -56,9 +38,54 @@ save-logs:
 	mv $(PGLOGS) "$(PGLOGS)_$(random)" || true
 	mv conduit.log "conduit_$(random).log" || true
 
+build:
+	cd .. && make
+
+pg-enter:
+	docker exec -it $(PGCONT) psql -U algorand -d postgres
+
+run-conduit: build
+	$(CONDUIT) -d conduit_data
+
+# - for query hackery... prefer pg_stats.ipynb
+PGCONN = postgresql://algorand:algorand@localhost:65432/performance_db
+
+QUERY_COL = substring(trim(regexp_replace(regexp_replace(query, '--.*?$$', '', 'gn'), '\\s+', ' ', 'g')), 1, 100) AS query
+TOTAL_SECS_COL = round((total_exec_time/1000)::numeric, 3) AS tot_s
+MEAN_SECS_COL = round((mean_exec_time/1000)::numeric, 3) AS mean_s
+MIN_SECS_COL = round((min_exec_time/1000)::numeric, 3) AS min_s
+MAX_SECS_COL = round((max_exec_time/1000)::numeric, 3) AS max_s
+CPU_COL = round((100 * total_exec_time / sum(total_exec_time::numeric) OVER ())::numeric, 2) AS \"cpu%\"
+LIMIT = 15
+
+define QUERY_TOTAL_TIME
+-c "SELECT dbid, $(QUERY_COL), $(TOTAL_SECS_COL), calls, $(MEAN_SECS_COL), $(CPU_COL) \
+FROM pg_stat_statements \
+ORDER BY total_exec_time DESC \
+LIMIT $(LIMIT);"
+endef
+
+define QUERY_SLOWEST
+-c "SELECT dbid, $(QUERY_COL), calls, $(TOTAL_SECS_COL), $(MIN_SECS_COL), $(MAX_SECS_COL), $(MEAN_SECS_COL) \
+FROM pg_stat_statements \
+ORDER BY mean_exec_time DESC \
+LIMIT $(LIMIT);"
+endef
+
+define QUERY_MEMHOG
+-c "SELECT dbid, $(QUERY_COL), (shared_blks_hit+shared_blks_dirtied) as mem  \
+FROM pg_stat_statements \
+ORDER BY (shared_blks_hit+shared_blks_dirtied) DESC \
+LIMIT $(LIMIT);"
+endef
+
 QUERY := -c "SELECT * FROM pg_stat_statements LIMIT 0;"
 pg-query:
 	psql $(PGCONN) $(QUERY)
+
+
+pg-txn-stats: QUERY=-c "SELECT max(round) AS max_round, count(*) AS txn_count from txn;"
+pg-txn-stats: pg-query
 
 pg-conn: QUERY=
 pg-conn: pg-query
@@ -76,32 +103,3 @@ pg-stats-2: pg-query
 
 pg-stats-3: QUERY=$(QUERY_MEMHOG)
 pg-stats-3: pg-query
-
-
-pg-enter:
-	docker exec -it $(PGCONT) psql -U algorand -d postgres
-
-pg-down:
-	docker-compose down
-
-build:
-	cd .. && make
-
-run-conduit: build
-	$(CONDUIT) -d conduit_data
-
-run-file-exporter:
-	make run-runner TEMPLATE="--template file-exporter" TIMES=1 RESETDB=
-
-clean-reports:
-	rm -rf $(REPORTS)
-
-pre-git-push:
-	mv _go.mod go.mod
-	mv _go.sum go.sum
-	cd ../../ && make tidy
-
-post-git-push:
-	mv go.mod _go.mod
-	mv go.sum _go.sum
-	cd ../../ && make tidy && go get github.com/lib/pq
