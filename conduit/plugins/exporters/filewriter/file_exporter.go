@@ -21,6 +21,9 @@ const (
 
 	// FilePattern is used to name the output files.
 	FilePattern = "%[1]d_block.msgp.gz"
+
+	// GenesisFilename is the name of the genesis file.
+	GenesisFilename = "genesis.json"
 )
 
 type fileExporter struct {
@@ -72,15 +75,11 @@ func (exp *fileExporter) Init(_ context.Context, initProvider data.InitProvider,
 
 	exp.round = uint64(initProvider.NextDBRound())
 
-	// export the genesis as well in the same format
 	genesis := initProvider.GetGenesis()
-	genesisFile, err := GenesisFilename(exp.format, exp.gzip)
-	if err != nil {
-		return fmt.Errorf("Init() error: %w", err)
-	}
+	genesisPath := path.Join(exp.cfg.BlocksDir, GenesisFilename)
 
-	genesisPath := path.Join(exp.cfg.BlocksDir, genesisFile)
-	err = EncodeToFile(genesisPath, genesis, exp.format, exp.gzip)
+	// the genesis is always exported as plain JSON:
+	err = EncodeToFile(genesisPath, genesis, JSONFormat, false)
 	if err != nil {
 		return fmt.Errorf("Init() error sending to genesisPath=%s: %w", genesisPath, err)
 	}

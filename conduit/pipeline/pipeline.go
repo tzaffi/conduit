@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"runtime/pprof"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
+	yaml "gopkg.in/yaml.v3"
 
 	sdk "github.com/algorand/go-algorand-sdk/v2/types"
 
@@ -36,6 +38,12 @@ type Pipeline interface {
 	Stop()
 	Error() error
 	Wait()
+	Status() (Status, error)
+}
+
+// Status is a struct that contains the current pipeline status.
+type Status struct {
+	Round uint64 `json:"round"`
 }
 
 type pipelineImpl struct {
@@ -56,6 +64,9 @@ type pipelineImpl struct {
 	completeCallback []conduit.OnCompleteFunc
 
 	pipelineMetadata state
+
+	statusMu sync.Mutex
+	status   Status
 }
 
 type pluginChannel chan data.BlockData
@@ -115,22 +126,28 @@ func (p *pipelineImpl) registerPluginMetricsCallbacks() {
 	}
 }
 
-// configWithLogger creates a plugin config from a name and config pair.
+// makeConfig creates a plugin config from a name and config pair.
 // It also creates a logger for the plugin and configures it using the pipeline's log settings.
-func (p *pipelineImpl) configWithLogger(cfg data.NameConfigPair, pluginType plugins.PluginType) (*log.Logger, plugins.PluginConfig, error) {
-	var dataDir string
-	if p.cfg.ConduitArgs != nil {
-		dataDir = p.cfg.ConduitArgs.ConduitDataDir
-	}
-	config, err := pluginType.GetConfig(cfg, dataDir)
+func (p *pipelineImpl) makeConfig(cfg data.NameConfigPair, pluginType plugins.PluginType) (*log.Logger, plugins.PluginConfig, error) {
+	configs, err := yaml.Marshal(cfg.Config)
 	if err != nil {
-		return nil, plugins.PluginConfig{}, fmt.Errorf("configWithLogger(): unable to create plugin config: %w", err)
+		return nil, plugins.PluginConfig{}, fmt.Errorf("makeConfig(): could not serialize config: %w", err)
 	}
 
 	lgr := log.New()
 	lgr.SetOutput(p.logger.Out)
 	lgr.SetLevel(p.logger.Level)
 	lgr.SetFormatter(makePluginLogFormatter(string(pluginType), cfg.Name))
+
+	var config plugins.PluginConfig
+	config.Config = string(configs)
+	if p.cfg != nil && p.cfg.ConduitArgs != nil {
+		config.DataDir = path.Join(p.cfg.ConduitArgs.ConduitDataDir, fmt.Sprintf("%s_%s", pluginType, cfg.Name))
+		err = os.MkdirAll(config.DataDir, os.ModePerm)
+		if err != nil {
+			return nil, plugins.PluginConfig{}, fmt.Errorf("makeConfig: unable to create plugin data directory: %w", err)
+		}
+	}
 
 	return lgr, config, nil
 }
@@ -177,7 +194,7 @@ func (p *pipelineImpl) pluginRoundOverride() (uint64, error) {
 	var pluginOverride uint64
 	var pluginOverrideName string // cache this in case of error.
 	for _, part := range parts {
-		_, config, err := p.configWithLogger(part.cfg, part.t)
+		_, config, err := p.makeConfig(part.cfg, part.t)
 		if err != nil {
 			return 0, err
 		}
@@ -308,7 +325,7 @@ func (p *pipelineImpl) Init() error {
 
 	// Initialize Importer
 	{
-		importerLogger, pluginConfig, err := p.configWithLogger(p.cfg.Importer, plugins.Importer)
+		importerLogger, pluginConfig, err := p.makeConfig(p.cfg.Importer, plugins.Importer)
 		if err != nil {
 			return fmt.Errorf("Pipeline.Init(): could not make %s config: %w", p.cfg.Importer.Name, err)
 		}
@@ -341,7 +358,7 @@ func (p *pipelineImpl) Init() error {
 	// Initialize Processors
 	for idx, processor := range p.processors {
 		ncPair := p.cfg.Processors[idx]
-		logger, config, err := p.configWithLogger(ncPair, plugins.Processor)
+		logger, config, err := p.makeConfig(ncPair, plugins.Processor)
 		if err != nil {
 			return fmt.Errorf("Pipeline.Init(): could not initialize processor (%s): %w", ncPair, err)
 		}
@@ -354,7 +371,7 @@ func (p *pipelineImpl) Init() error {
 
 	// Initialize Exporter
 	{
-		logger, config, err := p.configWithLogger(p.cfg.Exporter, plugins.Exporter)
+		logger, config, err := p.makeConfig(p.cfg.Exporter, plugins.Exporter)
 		if err != nil {
 			return fmt.Errorf("Pipeline.Init(): could not initialize processor (%s): %w", p.cfg.Exporter.Name, err)
 		}
@@ -373,6 +390,10 @@ func (p *pipelineImpl) Init() error {
 		p.registerPluginMetricsCallbacks()
 		go p.startMetricsServer()
 	}
+
+	p.statusMu.Lock()
+	defer p.statusMu.Unlock()
+	p.status.Round = p.pipelineMetadata.NextRound
 
 	return err
 }
@@ -594,6 +615,9 @@ func (p *pipelineImpl) exporterHandler(exporter exporters.Exporter, blkChan plug
 				// Increment Round, update metadata
 				nextRound := lastRound + 1
 				p.pipelineMetadata.NextRound = nextRound
+				p.statusMu.Lock()
+				p.status.Round = nextRound
+				p.statusMu.Unlock()
 				lastError = p.pipelineMetadata.encodeToFile(p.cfg.ConduitArgs.ConduitDataDir)
 				if lastError != nil {
 					lastError = fmt.Errorf("aborting after updating NextRound=%d BUT failing to save metadata: %w", nextRound, lastError)
@@ -678,6 +702,13 @@ func (p *pipelineImpl) Start() {
 
 func (p *pipelineImpl) Wait() {
 	p.wg.Wait()
+}
+
+func (p *pipelineImpl) Status() (Status, error) {
+	p.statusMu.Lock()
+	ret := p.status
+	p.statusMu.Unlock()
+	return ret, nil
 }
 
 // start a http server serving /metrics
