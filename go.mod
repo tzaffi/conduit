@@ -2,7 +2,7 @@ module github.com/algorand/conduit
 
 go 1.20
 
-replace github.com/algorand/indexer/v3 => github.com/algorand/indexer/v3 v3.1.1-0.20230822025726-77f03c0b6c37
+replace github.com/algorand/indexer/v3 => github.com/algorand/indexer/v3 v3.1.1-0.20230822025656-64cef373bdcb
 
 require (
 	github.com/algorand/go-algorand-sdk/v2 v2.2.0
