@@ -4,6 +4,16 @@ PGUSER = algorand
 PGDB = performance_db # postgres
 PGLOGS = pg.log
 CONDUIT = ../cmd/conduit/conduit
+PGCONN = postgresql://$(PGUSER):$(PGUSER)@localhost:65432/$(PGDB)
+
+echo:
+	@echo "random--->$(random)"
+	@echo "PGCONT--->$(PGCONT)"
+	@echo "PGUSER--->$(PGUSER)"
+	@echo "PGDB--->$(PGDB)"
+	@echo "PGLOGS--->$(PGLOGS)"
+	@echo "CONDUIT--->$(CONDUIT)"
+	@echo "PGCONN--->$(PGCONN)"
 
 nuke: pg-down clean
 
@@ -48,7 +58,6 @@ run-conduit: build
 	$(CONDUIT) -d conduit_data
 
 # - for query hackery... prefer pg_stats.ipynb
-PGCONN = postgresql://algorand:algorand@localhost:65432/performance_db
 
 QUERY_COL = substring(trim(regexp_replace(regexp_replace(query, '--.*?$$', '', 'gn'), '\\s+', ' ', 'g')), 1, 100) AS query
 TOTAL_SECS_COL = round((total_exec_time/1000)::numeric, 3) AS tot_s
@@ -103,3 +112,9 @@ pg-stats-2: pg-query
 
 pg-stats-3: QUERY=$(QUERY_MEMHOG)
 pg-stats-3: pg-query
+
+pg-blocking-vac: QUERY=-c "VACUUM FULL ANALYZE;"
+pg-blocking-vac: pg-query
+
+pg-vac: QUERY=-c "VACUUM;"
+pg-vac: pg-query
