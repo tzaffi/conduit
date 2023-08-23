@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	logLevel   = log.ErrorLevel // log.DebugLevel // log.InfoLevel //  log.TraceLevel //
-	retryCount = 3              // math.MaxUint64
+	logLevel   = log.ErrorLevel
+	retryCount = 3
 )
 
 type sleepingImporter struct {

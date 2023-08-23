@@ -49,7 +49,7 @@ save-logs:
 	mv conduit.log "conduit_$(random).log" || true
 
 build:
-	cd .. && make
+	cd .. && go mod tidy && make
 
 pg-enter:
 	docker exec -it $(PGCONT) psql -U algorand -d postgres
