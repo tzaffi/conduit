@@ -1,4 +1,4 @@
-log-level: info
+log-level: debug
 log-file: conduit.log
 retry-count: 1
 retry-delay: "1s"
