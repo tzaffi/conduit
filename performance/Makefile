@@ -16,6 +16,8 @@ echo:
 	@echo "PGCONN--->$(PGCONN)"
 
 nuke: pg-down clean
+	rm conduit_*.log || true
+	rm pg.log_* || true
 
 nuke-and-run: nuke perf-run
 
@@ -29,7 +31,6 @@ clean: # pg-down should be called manually
 
 clean-go-cache:
 	cd .. && go clean -cache -testcache -modcache
-
 
 pg-up: save-logs
 	docker-compose up -d
