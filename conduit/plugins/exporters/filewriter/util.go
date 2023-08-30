@@ -61,7 +61,7 @@ func ParseFilenamePattern(pattern string) (EncodingFormat, bool, error) {
 	return blockFormat, gzip, nil
 }
 
-// EncodeToFile enocods an object to a file using a given format and possible gzip compression.
+// EncodeToFile encodes an object to a file using a given format and possible gzip compression.
 func EncodeToFile(filename string, v interface{}, format EncodingFormat, isGzip bool) error {
 	file, err := os.Create(filename)
 	if err != nil {
@@ -91,7 +91,7 @@ func Encode(format EncodingFormat, writer io.Writer, v interface{}) error {
 	case MessagepackFormat:
 		handle = msgpack.LenientCodecHandle
 	default:
-		return fmt.Errorf("EncodeToFile(): unhandled format %d", format)
+		return fmt.Errorf("Encode(): unhandled format %d", format)
 	}
 	return codec.NewEncoder(writer, handle).Encode(v)
 }

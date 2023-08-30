@@ -40,8 +40,10 @@ func init() {
 }
 
 func TestDefaults(t *testing.T) {
-	require.Equal(t, defaultEncodingFormat, filewriter.MessagepackFormat)
-	require.Equal(t, defaultIsGzip, true)
+	format, gzip, err := filewriter.ParseFilenamePattern(filewriter.FilePattern)
+	require.NoError(t, err)
+	require.Equal(t, format, defaultEncodingFormat)
+	require.Equal(t, gzip, defaultIsGzip)
 }
 
 func TestImporterorterMetadata(t *testing.T) {
@@ -64,9 +66,7 @@ func initializeTestData(t *testing.T, dir string, numRounds int) sdk.Genesis {
 		Timestamp:   1234,
 	}
 
-	genesisFilename := filewriter.GenesisFilename
-
-	err := filewriter.EncodeToFile(path.Join(dir, genesisFilename), genesisA, filewriter.JSONFormat, false)
+	err := filewriter.EncodeToFile(path.Join(dir, filewriter.GenesisFilename), genesisA, filewriter.JSONFormat, false)
 	require.NoError(t, err)
 
 	for i := 0; i < numRounds; i++ {
