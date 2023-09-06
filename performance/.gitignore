@@ -1,0 +1,3 @@
+conduit*.log
+pg.log*
+metadata.json

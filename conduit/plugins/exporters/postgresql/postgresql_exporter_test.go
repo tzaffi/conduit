@@ -111,7 +111,7 @@ func TestUnmarshalConfigsContainingDeleteTask(t *testing.T) {
 		pgsqlExp := postgresqlExporter{}
 		ecfg := ExporterConfig{
 			ConnectionString: "",
-			MaxConn:          0,
+			MaxConns:          0,
 			Test:             true,
 			Delete: util.PruneConfigurations{
 				Rounds:   3000,
@@ -133,7 +133,7 @@ func TestUnmarshalConfigsContainingDeleteTask(t *testing.T) {
 		pgsqlExp := postgresqlExporter{}
 		cfg := ExporterConfig{
 			ConnectionString: "",
-			MaxConn:          0,
+			MaxConns:          0,
 			Test:             true,
 			Delete:           util.PruneConfigurations{},
 		}
@@ -152,7 +152,7 @@ func TestUnmarshalConfigsContainingDeleteTask(t *testing.T) {
 		pgsqlExp := postgresqlExporter{}
 		cfg := ExporterConfig{
 			ConnectionString: "",
-			MaxConn:          0,
+			MaxConns:          0,
 			Test:             true,
 			Delete: util.PruneConfigurations{
 				Rounds:   1,

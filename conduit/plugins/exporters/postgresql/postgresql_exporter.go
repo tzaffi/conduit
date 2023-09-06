@@ -59,7 +59,7 @@ func createIndexerDB(logger *logrus.Logger, readonly bool, cfg plugins.PluginCon
 	if err := cfg.UnmarshalConfig(&eCfg); err != nil {
 		return nil, nil, eCfg, fmt.Errorf("connect failure in unmarshalConfig: %v", err)
 	}
-	logger.Debugf("createIndexerDB: eCfg.Delete=%+v", eCfg.Delete)
+	logger.Debugf("createIndexerDB: eCfg.MaxConns=%d, eCfg.Test=%t, eCfg.Delete=%+v", eCfg.MaxConns, eCfg.Test, eCfg.Delete)
 
 	// Inject a dummy db for unit testing
 	dbName := "postgres"
@@ -67,7 +67,7 @@ func createIndexerDB(logger *logrus.Logger, readonly bool, cfg plugins.PluginCon
 		dbName = "dummy"
 	}
 	var opts idb.IndexerDbOptions
-	opts.MaxConn = eCfg.MaxConn
+	opts.MaxConns = eCfg.MaxConns
 	opts.ReadOnly = readonly
 
 	// for some reason when ConnectionString is empty, it's automatically
