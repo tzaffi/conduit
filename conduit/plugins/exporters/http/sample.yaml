@@ -1,0 +1,14 @@
+name: http
+# Currently this is only for local hosting
+config:
+  # TODO: External HTTP server address.
+  # nethost: "http://your-exoporter-receive-url"
+
+  # TODO: enable authentication. 
+
+  # Service port
+  port: 1337
+
+  # Service endpoint
+  endpoint: "/receive"
+  
